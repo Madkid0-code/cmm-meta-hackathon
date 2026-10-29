@@ -1,0 +1,78 @@
+{
+ "attested_skills": [
+  {
+   "evidence": "9 years, primary language across all roles",
+   "term": "Python"
+  },
+  {
+   "evidence": "9 years, complex analytics and pipeline queries",
+   "term": "SQL"
+  },
+  {
+   "evidence": "6 years building batch pipelines on Amazon EMR",
+   "term": "PySpark"
+  },
+  {
+   "evidence": "6 years, production clusters",
+   "term": "Amazon EMR"
+  },
+  {
+   "evidence": "5 years, schema management",
+   "term": "AWS Glue Catalog"
+  },
+  {
+   "evidence": "7 years, data lake storage",
+   "term": "Amazon S3"
+  },
+  {
+   "evidence": "4 years, ACID tables on S3",
+   "term": "Delta Lake"
+  },
+  {
+   "evidence": "5 years, DAG authoring and operations",
+   "term": "Apache Airflow"
+  },
+  {
+   "evidence": "3 years, SQL models and SnowSQL only",
+   "term": "Snowflake"
+  },
+  {
+   "evidence": "2 years, transformation models and tests",
+   "term": "dbt"
+  }
+ ],
+ "hard_boundaries": [
+  "Never used Snowpark in production",
+  "No Kafka or streaming production experience",
+  "No Terraform \u2014 infrastructure was managed by a platform team"
+ ],
+ "name": "Alex Rivera",
+ "note": "FICTIONAL demo persona. Every fact below is invented for the demo.",
+ "raw_resume_file": "raw_resume.md",
+ "search": {
+  "contract_only": true,
+  "keywords": [
+   "data engineer pyspark",
+   "data engineer python sql"
+  ],
+  "location": "United States",
+  "match_skills": [
+   "python",
+   "sql",
+   "pyspark",
+   "tableau",
+   "power bi"
+  ],
+  "posted_within_hours": 24,
+  "sources": [
+   "dice",
+   "remoteok",
+   "arbeitnow",
+   "linkedin_guest"
+  ],
+  "job_types": [
+   "contract"
+  ],
+  "workplace": []
+ }
+}

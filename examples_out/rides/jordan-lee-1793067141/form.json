@@ -1,0 +1,65 @@
+{
+ "name": "Jordan Lee",
+ "attested_skills": [
+  {
+   "term": "Python",
+   "evidence": "8 years, primary language across all roles"
+  },
+  {
+   "term": "SQL",
+   "evidence": "8 years, complex analytics and pipeline queries"
+  },
+  {
+   "term": "PySpark",
+   "evidence": "5 years building batch pipelines on Amazon EMR"
+  },
+  {
+   "term": "Amazon EMR",
+   "evidence": "5 years, production clusters"
+  },
+  {
+   "term": "Amazon S3",
+   "evidence": "6 years, data lake storage"
+  },
+  {
+   "term": "Apache Airflow",
+   "evidence": "4 years, DAG authoring and operations"
+  },
+  {
+   "term": "Snowflake",
+   "evidence": "2 years, SQL models and SnowSQL only"
+  },
+  {
+   "term": "dbt",
+   "evidence": "2 years, transformation models and tests"
+  }
+ ],
+ "hard_boundaries": [
+  "Never used Snowpark in production",
+  "No Kafka or streaming production experience",
+  "No Terraform"
+ ],
+ "search": {
+  "keywords": [
+   "data engineer pyspark",
+   "data engineer python sql"
+  ],
+  "match_skills": [
+   "python",
+   "sql",
+   "pyspark",
+   "tableau",
+   "power bi"
+  ],
+  "location": "United States",
+  "contract_only": true,
+  "posted_within_hours": 24,
+  "sources": [
+   "dice",
+   "remoteok",
+   "arbeitnow",
+   "linkedin_guest"
+  ]
+ },
+ "raw_resume_file": "raw_resume.md"
+}

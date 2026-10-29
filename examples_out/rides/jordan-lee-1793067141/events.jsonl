@@ -1,0 +1,144 @@
+{"ts": "2026-10-27T02:12:21+00:00", "actor": "system", "message": "Form in: Jordan Lee \u2014 8 attested claims"}
+{"ts": "2026-10-27T02:12:21+00:00", "actor": "guardrail", "message": "Intake check: auditing the resume the seeker was about to send"}
+{"ts": "2026-10-27T02:12:21+00:00", "actor": "guardrail", "message": "GUARDRAIL ALERT [intake:unattested_term] kafka: 'kafka' appears in the draft but is not in the attested profile."}
+{"ts": "2026-10-27T02:12:21+00:00", "actor": "guardrail", "message": "GUARDRAIL ALERT [intake:unattested_term] snowpark: 'snowpark' appears in the draft but is not in the attested profile."}
+{"ts": "2026-10-27T02:12:21+00:00", "actor": "guardrail", "message": "GUARDRAIL ALERT [intake:unattested_term] terraform: 'terraform' appears in the draft but is not in the attested profile."}
+{"ts": "2026-10-27T02:12:21+00:00", "actor": "guardrail", "message": "GUARDRAIL ALERT [intake:invented_metric] 40%: Metric '40%' appears in the draft but no such figure (number + unit) exists in the attested profile."}
+{"ts": "2026-10-27T02:12:22+00:00", "actor": "shopper", "message": "Sweep config #1: keywords=['data engineer pyspark', 'data engineer python sql']"}
+{"ts": "2026-10-27T02:12:39+00:00", "actor": "sweeper", "message": "dice: 6 fetched, 6 new raw postings"}
+{"ts": "2026-10-27T02:12:43+00:00", "actor": "sweeper", "message": "remoteok: 14 fetched, 14 new raw postings"}
+{"ts": "2026-10-27T02:13:12+00:00", "actor": "sweeper", "message": "arbeitnow: 300 fetched, 300 new raw postings"}
+{"ts": "2026-10-27T02:13:14+00:00", "actor": "sweeper", "message": "linkedin_guest: 10 fetched, 10 new raw postings"}
+{"ts": "2026-10-27T02:13:42+00:00", "actor": "parser", "message": "parsed 317 postings (13 company+title dupes, 10 thin JDs)"}
+{"ts": "2026-10-27T02:13:42+00:00", "actor": "verdict", "message": "Keep rule: 23 postings match >=2 skills; Reader will process top 13"}
+{"ts": "2026-10-27T02:13:42+00:00", "actor": "reader", "message": "Reader Agent calling Muse Spark for structured extraction"}
+{"ts": "2026-10-27T02:13:53+00:00", "actor": "reader", "message": "Muse Spark reasoning in progress \u2014 streaming: 1 chunks, 20 chars received, 11.4s elapsed"}
+{"ts": "2026-10-27T02:13:54+00:00", "actor": "reader", "message": "Muse Spark reasoning tokens: 3615 | total tokens: 4359"}
+{"ts": "2026-10-27T02:13:54+00:00", "actor": "reader", "message": "Extracted 10 core constraints"}
+{"ts": "2026-10-27T02:13:54+00:00", "actor": "verdict", "message": "PASS: Data Engineer - Python, PySpark, SQL, Snowflake & API Integration (New Role) -  Canada- Remote @ iFusion Inc. \u2014 core pool skills defensible: python, sql, pyspark (4 defensible / 6 vulnerable \u2014 gaps itemized in the dossier)"}
+{"ts": "2026-10-27T02:13:54+00:00", "actor": "builder", "message": "Baseline draft: a conventional AI resume writer, unguarded"}
+{"ts": "2026-10-27T02:14:03+00:00", "actor": "builder", "message": "Builder ingesting the raw unaudited resume \u2014 reconcile mode"}
+{"ts": "2026-10-27T02:14:03+00:00", "actor": "builder", "message": "Builder Agent drafting (round 1)"}
+{"ts": "2026-10-27T02:14:14+00:00", "actor": "builder", "message": "Muse Spark reasoning in progress \u2014 streaming: 1 chunks, 26 chars received, 10.8s elapsed"}
+{"ts": "2026-10-27T02:14:14+00:00", "actor": "builder", "message": "Muse Spark reasoning tokens: 3080 | total tokens: 3572"}
+{"ts": "2026-10-27T02:14:14+00:00", "actor": "guardrail", "message": "GUARDRAIL PASSED \u2014 draft is fully attested"}
+{"ts": "2026-10-27T02:14:14+00:00", "actor": "builder", "message": "Resume built + guardrail PASSED: /home/hatch/workspace/goals/meta-hackathon-cmm-showcase/build/attested/examples_out/rides/jordan-lee-1793067141/matches/1/resume.md"}
+{"ts": "2026-10-27T02:14:14+00:00", "actor": "system", "message": "Dossier written: /home/hatch/workspace/goals/meta-hackathon-cmm-showcase/build/attested/examples_out/rides/jordan-lee-1793067141/matches/1/dossier.md"}
+{"ts": "2026-10-27T02:14:14+00:00", "actor": "reader", "message": "Reader Agent calling Muse Spark for structured extraction"}
+{"ts": "2026-10-27T02:14:40+00:00", "actor": "reader", "message": "Muse Spark reasoning in progress \u2014 streaming: 1 chunks, 20 chars received, 25.3s elapsed"}
+{"ts": "2026-10-27T02:14:41+00:00", "actor": "reader", "message": "Muse Spark reasoning tokens: 7721 | total tokens: 8843"}
+{"ts": "2026-10-27T02:14:41+00:00", "actor": "reader", "message": "Extracted 23 core constraints"}
+{"ts": "2026-10-27T02:14:41+00:00", "actor": "verdict", "message": "PASS: AWS Data Engineer with AI Skills @ StoneGate-Technologies LLC \u2014 core pool skills defensible: python, sql, pyspark (4 defensible / 18 vulnerable \u2014 gaps itemized in the dossier)"}
+{"ts": "2026-10-27T02:14:41+00:00", "actor": "builder", "message": "Baseline draft: a conventional AI resume writer, unguarded"}
+{"ts": "2026-10-27T02:14:50+00:00", "actor": "guardrail", "message": "GUARDRAIL ALERT [baseline:unattested_term] kafka: 'kafka' appears in the draft but is not in the attested profile."}
+{"ts": "2026-10-27T02:14:50+00:00", "actor": "guardrail", "message": "Baseline REJECTED with 1 violation(s). This is what ships without a guardrail."}
+{"ts": "2026-10-27T02:14:50+00:00", "actor": "builder", "message": "Builder ingesting the raw unaudited resume \u2014 reconcile mode"}
+{"ts": "2026-10-27T02:14:50+00:00", "actor": "builder", "message": "Builder Agent drafting (round 1)"}
+{"ts": "2026-10-27T02:14:59+00:00", "actor": "builder", "message": "Muse Spark reasoning in progress \u2014 streaming: 1 chunks, 26 chars received, 9.2s elapsed"}
+{"ts": "2026-10-27T02:14:59+00:00", "actor": "builder", "message": "Muse Spark reasoning tokens: 2888 | total tokens: 3427"}
+{"ts": "2026-10-27T02:14:59+00:00", "actor": "guardrail", "message": "GUARDRAIL PASSED \u2014 draft is fully attested"}
+{"ts": "2026-10-27T02:14:59+00:00", "actor": "builder", "message": "Resume built + guardrail PASSED: /home/hatch/workspace/goals/meta-hackathon-cmm-showcase/build/attested/examples_out/rides/jordan-lee-1793067141/matches/6/resume.md"}
+{"ts": "2026-10-27T02:14:59+00:00", "actor": "system", "message": "Dossier written: /home/hatch/workspace/goals/meta-hackathon-cmm-showcase/build/attested/examples_out/rides/jordan-lee-1793067141/matches/6/dossier.md"}
+{"ts": "2026-10-27T02:14:59+00:00", "actor": "reader", "message": "Reader Agent calling Muse Spark for structured extraction"}
+{"ts": "2026-10-27T02:15:17+00:00", "actor": "reader", "message": "Muse Spark reasoning in progress \u2014 streaming: 1 chunks, 20 chars received, 17.4s elapsed"}
+{"ts": "2026-10-27T02:15:19+00:00", "actor": "reader", "message": "Muse Spark reasoning tokens: 6219 | total tokens: 8909"}
+{"ts": "2026-10-27T02:15:19+00:00", "actor": "reader", "message": "Extracted 34 core constraints"}
+{"ts": "2026-10-27T02:15:19+00:00", "actor": "verdict", "message": "PASS: Senior Data Scientist @ Carwow \u2014 core pool skills defensible: python, sql (4 defensible / 30 vulnerable \u2014 gaps itemized in the dossier)"}
+{"ts": "2026-10-27T02:15:19+00:00", "actor": "builder", "message": "Baseline draft: a conventional AI resume writer, unguarded"}
+{"ts": "2026-10-27T02:15:28+00:00", "actor": "guardrail", "message": "GUARDRAIL ALERT [baseline:unattested_term] bigquery: 'bigquery' appears in the draft but is not in the attested profile."}
+{"ts": "2026-10-27T02:15:28+00:00", "actor": "guardrail", "message": "GUARDRAIL ALERT [baseline:unattested_term] looker: 'looker' appears in the draft but is not in the attested profile."}
+{"ts": "2026-10-27T02:15:28+00:00", "actor": "guardrail", "message": "Baseline REJECTED with 2 violation(s). This is what ships without a guardrail."}
+{"ts": "2026-10-27T02:15:28+00:00", "actor": "builder", "message": "Builder ingesting the raw unaudited resume \u2014 reconcile mode"}
+{"ts": "2026-10-27T02:15:28+00:00", "actor": "builder", "message": "Builder Agent drafting (round 1)"}
+{"ts": "2026-10-27T02:15:36+00:00", "actor": "builder", "message": "Muse Spark reasoning in progress \u2014 streaming: 1 chunks, 21 chars received, 8.5s elapsed"}
+{"ts": "2026-10-27T02:15:36+00:00", "actor": "builder", "message": "Muse Spark reasoning tokens: 3177 | total tokens: 3764"}
+{"ts": "2026-10-27T02:15:36+00:00", "actor": "guardrail", "message": "GUARDRAIL PASSED \u2014 draft is fully attested"}
+{"ts": "2026-10-27T02:15:36+00:00", "actor": "builder", "message": "Resume built + guardrail PASSED: /home/hatch/workspace/goals/meta-hackathon-cmm-showcase/build/attested/examples_out/rides/jordan-lee-1793067141/matches/150/resume.md"}
+{"ts": "2026-10-27T02:15:36+00:00", "actor": "system", "message": "Dossier written: /home/hatch/workspace/goals/meta-hackathon-cmm-showcase/build/attested/examples_out/rides/jordan-lee-1793067141/matches/150/dossier.md"}
+{"ts": "2026-10-27T02:15:36+00:00", "actor": "reader", "message": "Reader Agent calling Muse Spark for structured extraction"}
+{"ts": "2026-10-27T02:15:47+00:00", "actor": "reader", "message": "Muse Spark reasoning in progress \u2014 streaming: 1 chunks, 20 chars received, 11.0s elapsed"}
+{"ts": "2026-10-27T02:15:49+00:00", "actor": "reader", "message": "Muse Spark reasoning tokens: 3934 | total tokens: 5199"}
+{"ts": "2026-10-27T02:15:49+00:00", "actor": "reader", "message": "Extracted 28 core constraints"}
+{"ts": "2026-10-27T02:15:49+00:00", "actor": "verdict", "message": "PASS: Senior Data Analytics Engineer-Python, Snowflake, AWS @ Atash Enterprises, LLC \u2014 core pool skills defensible: python, sql (3 defensible / 25 vulnerable \u2014 gaps itemized in the dossier)"}
+{"ts": "2026-10-27T02:15:49+00:00", "actor": "builder", "message": "Baseline draft: a conventional AI resume writer, unguarded"}
+{"ts": "2026-10-27T02:16:00+00:00", "actor": "builder", "message": "Builder ingesting the raw unaudited resume \u2014 reconcile mode"}
+{"ts": "2026-10-27T02:16:00+00:00", "actor": "builder", "message": "Builder Agent drafting (round 1)"}
+{"ts": "2026-10-27T02:16:13+00:00", "actor": "builder", "message": "Muse Spark reasoning in progress \u2014 streaming: 1 chunks, 24 chars received, 12.8s elapsed"}
+{"ts": "2026-10-27T02:16:13+00:00", "actor": "builder", "message": "Muse Spark reasoning tokens: 4004 | total tokens: 4556"}
+{"ts": "2026-10-27T02:16:13+00:00", "actor": "guardrail", "message": "GUARDRAIL PASSED \u2014 draft is fully attested"}
+{"ts": "2026-10-27T02:16:13+00:00", "actor": "builder", "message": "Resume built + guardrail PASSED: /home/hatch/workspace/goals/meta-hackathon-cmm-showcase/build/attested/examples_out/rides/jordan-lee-1793067141/matches/3/resume.md"}
+{"ts": "2026-10-27T02:16:13+00:00", "actor": "system", "message": "Dossier written: /home/hatch/workspace/goals/meta-hackathon-cmm-showcase/build/attested/examples_out/rides/jordan-lee-1793067141/matches/3/dossier.md"}
+{"ts": "2026-10-27T02:16:13+00:00", "actor": "reader", "message": "Reader Agent calling Muse Spark for structured extraction"}
+{"ts": "2026-10-27T02:16:27+00:00", "actor": "reader", "message": "Muse Spark reasoning in progress \u2014 streaming: 1 chunks, 20 chars received, 13.4s elapsed"}
+{"ts": "2026-10-27T02:16:28+00:00", "actor": "reader", "message": "Muse Spark reasoning tokens: 4680 | total tokens: 7049"}
+{"ts": "2026-10-27T02:16:28+00:00", "actor": "reader", "message": "Extracted 44 core constraints"}
+{"ts": "2026-10-27T02:16:28+00:00", "actor": "verdict", "message": "SKIP: Risk Analyst @ Pavago \u2014 core pool overlap too thin: 2 pool skill(s) defensible, 2 defensible / 42 vulnerable"}
+{"ts": "2026-10-27T02:16:28+00:00", "actor": "reader", "message": "Reader Agent calling Muse Spark for structured extraction"}
+{"ts": "2026-10-27T02:16:49+00:00", "actor": "reader", "message": "Muse Spark reasoning in progress \u2014 streaming: 1 chunks, 20 chars received, 21.3s elapsed"}
+{"ts": "2026-10-27T02:16:51+00:00", "actor": "reader", "message": "Muse Spark reasoning tokens: 7232 | total tokens: 8804"}
+{"ts": "2026-10-27T02:16:51+00:00", "actor": "reader", "message": "Extracted 31 core constraints"}
+{"ts": "2026-10-27T02:16:51+00:00", "actor": "verdict", "message": "PASS: Python/PySpark Data Engineer @ e-IT Professionals Corp. \u2014 core pool skills defensible: python, sql, pyspark (3 defensible / 27 vulnerable \u2014 gaps itemized in the dossier)"}
+{"ts": "2026-10-27T02:16:51+00:00", "actor": "builder", "message": "Baseline draft: a conventional AI resume writer, unguarded"}
+{"ts": "2026-10-27T02:17:04+00:00", "actor": "builder", "message": "Builder ingesting the raw unaudited resume \u2014 reconcile mode"}
+{"ts": "2026-10-27T02:17:04+00:00", "actor": "builder", "message": "Builder Agent drafting (round 1)"}
+{"ts": "2026-10-27T02:17:11+00:00", "actor": "builder", "message": "Muse Spark reasoning in progress \u2014 streaming: 1 chunks, 18 chars received, 6.9s elapsed"}
+{"ts": "2026-10-27T02:17:11+00:00", "actor": "builder", "message": "Muse Spark reasoning tokens: 1993 | total tokens: 2601"}
+{"ts": "2026-10-27T02:17:11+00:00", "actor": "guardrail", "message": "GUARDRAIL PASSED \u2014 draft is fully attested"}
+{"ts": "2026-10-27T02:17:11+00:00", "actor": "builder", "message": "Resume built + guardrail PASSED: /home/hatch/workspace/goals/meta-hackathon-cmm-showcase/build/attested/examples_out/rides/jordan-lee-1793067141/matches/2/resume.md"}
+{"ts": "2026-10-27T02:17:11+00:00", "actor": "system", "message": "Dossier written: /home/hatch/workspace/goals/meta-hackathon-cmm-showcase/build/attested/examples_out/rides/jordan-lee-1793067141/matches/2/dossier.md"}
+{"ts": "2026-10-27T02:17:11+00:00", "actor": "reader", "message": "Reader Agent calling Muse Spark for structured extraction"}
+{"ts": "2026-10-27T02:17:27+00:00", "actor": "reader", "message": "Muse Spark reasoning in progress \u2014 streaming: 1 chunks, 20 chars received, 15.8s elapsed"}
+{"ts": "2026-10-27T02:17:28+00:00", "actor": "reader", "message": "Muse Spark reasoning tokens: 5415 | total tokens: 7331"}
+{"ts": "2026-10-27T02:17:28+00:00", "actor": "reader", "message": "Extracted 31 core constraints"}
+{"ts": "2026-10-27T02:17:28+00:00", "actor": "verdict", "message": "PASS: DevOps / Infra Lead @ Payflows \u2014 core pool skills defensible: python, sql (3 defensible / 28 vulnerable \u2014 gaps itemized in the dossier)"}
+{"ts": "2026-10-27T02:17:28+00:00", "actor": "builder", "message": "Baseline draft: a conventional AI resume writer, unguarded"}
+{"ts": "2026-10-27T02:17:36+00:00", "actor": "builder", "message": "Builder ingesting the raw unaudited resume \u2014 reconcile mode"}
+{"ts": "2026-10-27T02:17:36+00:00", "actor": "builder", "message": "Builder Agent drafting (round 1)"}
+{"ts": "2026-10-27T02:17:53+00:00", "actor": "builder", "message": "Muse Spark reasoning in progress \u2014 streaming: 1 chunks, 20 chars received, 16.8s elapsed"}
+{"ts": "2026-10-27T02:17:53+00:00", "actor": "builder", "message": "Muse Spark reasoning tokens: 5452 | total tokens: 6028"}
+{"ts": "2026-10-27T02:17:53+00:00", "actor": "guardrail", "message": "GUARDRAIL PASSED \u2014 draft is fully attested"}
+{"ts": "2026-10-27T02:17:53+00:00", "actor": "builder", "message": "Resume built + guardrail PASSED: /home/hatch/workspace/goals/meta-hackathon-cmm-showcase/build/attested/examples_out/rides/jordan-lee-1793067141/matches/179/resume.md"}
+{"ts": "2026-10-27T02:17:53+00:00", "actor": "system", "message": "Dossier written: /home/hatch/workspace/goals/meta-hackathon-cmm-showcase/build/attested/examples_out/rides/jordan-lee-1793067141/matches/179/dossier.md"}
+{"ts": "2026-10-27T02:17:53+00:00", "actor": "reader", "message": "Reader Agent calling Muse Spark for structured extraction"}
+{"ts": "2026-10-27T02:18:13+00:00", "actor": "reader", "message": "Muse Spark reasoning in progress \u2014 streaming: 1 chunks, 20 chars received, 19.9s elapsed"}
+{"ts": "2026-10-27T02:18:14+00:00", "actor": "reader", "message": "Muse Spark reasoning tokens: 7435 | total tokens: 8543"}
+{"ts": "2026-10-27T02:18:14+00:00", "actor": "reader", "message": "Extracted 22 core constraints"}
+{"ts": "2026-10-27T02:18:14+00:00", "actor": "verdict", "message": "SKIP: Data Engineer @ DynPro Inc. \u2014 core pool overlap too thin: 2 pool skill(s) defensible, 2 defensible / 20 vulnerable"}
+{"ts": "2026-10-27T02:18:14+00:00", "actor": "reader", "message": "Reader Agent calling Muse Spark for structured extraction"}
+{"ts": "2026-10-27T02:18:36+00:00", "actor": "reader", "message": "Muse Spark reasoning in progress \u2014 streaming: 1 chunks, 20 chars received, 21.9s elapsed"}
+{"ts": "2026-10-27T02:18:38+00:00", "actor": "reader", "message": "Muse Spark reasoning tokens: 7732 | total tokens: 9481"}
+{"ts": "2026-10-27T02:18:38+00:00", "actor": "reader", "message": "Extracted 39 core constraints"}
+{"ts": "2026-10-27T02:18:38+00:00", "actor": "verdict", "message": "SKIP: Data Engineer Ab initio @ Applied Thought Auditors & Consultants Inc. \u2014 core pool overlap too thin: 2 pool skill(s) defensible, 2 defensible / 37 vulnerable"}
+{"ts": "2026-10-27T02:18:38+00:00", "actor": "reader", "message": "Reader Agent calling Muse Spark for structured extraction"}
+{"ts": "2026-10-27T02:18:48+00:00", "actor": "reader", "message": "Muse Spark reasoning in progress \u2014 streaming: 1 chunks, 20 chars received, 9.2s elapsed"}
+{"ts": "2026-10-27T02:18:49+00:00", "actor": "reader", "message": "Muse Spark reasoning tokens: 3527 | total tokens: 5494"}
+{"ts": "2026-10-27T02:18:49+00:00", "actor": "reader", "message": "Extracted 16 core constraints"}
+{"ts": "2026-10-27T02:18:49+00:00", "actor": "verdict", "message": "SKIP: Senior DevOps Engineer @ Lemon.io \u2014 core pool overlap too thin: 2 pool skill(s) defensible, 2 defensible / 14 vulnerable"}
+{"ts": "2026-10-27T02:18:49+00:00", "actor": "reader", "message": "Reader Agent calling Muse Spark for structured extraction"}
+{"ts": "2026-10-27T02:19:01+00:00", "actor": "reader", "message": "Muse Spark reasoning in progress \u2014 streaming: 1 chunks, 20 chars received, 12.7s elapsed"}
+{"ts": "2026-10-27T02:19:03+00:00", "actor": "reader", "message": "Muse Spark reasoning tokens: 4569 | total tokens: 7664"}
+{"ts": "2026-10-27T02:19:03+00:00", "actor": "reader", "message": "Extracted 26 core constraints"}
+{"ts": "2026-10-27T02:19:03+00:00", "actor": "verdict", "message": "SKIP: Production Support Engineer II - UK @ Marqeta Inc \u2014 core pool overlap too thin: 2 pool skill(s) defensible, 2 defensible / 24 vulnerable"}
+{"ts": "2026-10-27T02:19:03+00:00", "actor": "reader", "message": "Reader Agent calling Muse Spark for structured extraction"}
+{"ts": "2026-10-27T02:19:19+00:00", "actor": "reader", "message": "Muse Spark reasoning in progress \u2014 streaming: 1 chunks, 20 chars received, 15.8s elapsed"}
+{"ts": "2026-10-27T02:19:20+00:00", "actor": "reader", "message": "Muse Spark reasoning tokens: 4921 | total tokens: 6914"}
+{"ts": "2026-10-27T02:19:20+00:00", "actor": "reader", "message": "Extracted 16 core constraints"}
+{"ts": "2026-10-27T02:19:20+00:00", "actor": "verdict", "message": "SKIP: Golang Backend Engineer, Financial Product Fraud @ Deliveroo  \u2014 core pool overlap too thin: 2 pool skill(s) defensible, 2 defensible / 14 vulnerable"}
+{"ts": "2026-10-27T02:19:20+00:00", "actor": "reader", "message": "Reader Agent calling Muse Spark for structured extraction"}
+{"ts": "2026-10-27T02:19:32+00:00", "actor": "reader", "message": "Muse Spark reasoning in progress \u2014 streaming: 1 chunks, 20 chars received, 12.0s elapsed"}
+{"ts": "2026-10-27T02:19:33+00:00", "actor": "reader", "message": "Muse Spark reasoning tokens: 4074 | total tokens: 6694"}
+{"ts": "2026-10-27T02:19:33+00:00", "actor": "reader", "message": "Extracted 20 core constraints"}
+{"ts": "2026-10-27T02:19:33+00:00", "actor": "verdict", "message": "SKIP: Software Engineer II, Security @ Everquote \u2014 core pool overlap too thin: 2 pool skill(s) defensible, 2 defensible / 18 vulnerable"}
+{"ts": "2026-10-27T02:19:33+00:00", "actor": "applier", "message": "Pursuit #1 queued (dice) for posting 1"}
+{"ts": "2026-10-27T02:19:33+00:00", "actor": "applier", "message": "Pursuit #2 queued (dice) for posting 6"}
+{"ts": "2026-10-27T02:19:33+00:00", "actor": "applier", "message": "Pursuit #3 queued (board) for posting 150"}
+{"ts": "2026-10-27T02:19:34+00:00", "actor": "applier", "message": "Pursuit #4 queued (dice) for posting 3"}
+{"ts": "2026-10-27T02:19:34+00:00", "actor": "applier", "message": "Pursuit #5 queued (dice) for posting 2"}
+{"ts": "2026-10-27T02:19:34+00:00", "actor": "applier", "message": "Pursuit #6 queued (board) for posting 179"}
+{"ts": "2026-10-27T02:19:34+00:00", "actor": "applier", "message": "Pursuit #1 prepared: /home/hatch/workspace/goals/meta-hackathon-cmm-showcase/build/attested/examples_out/rides/jordan-lee-1793067141/matches/1/application_package.md"}
+{"ts": "2026-10-27T02:19:34+00:00", "actor": "applier", "message": "Pursuit #2 prepared: /home/hatch/workspace/goals/meta-hackathon-cmm-showcase/build/attested/examples_out/rides/jordan-lee-1793067141/matches/6/application_package.md"}
+{"ts": "2026-10-27T02:19:34+00:00", "actor": "applier", "message": "Pursuit #3 prepared: /home/hatch/workspace/goals/meta-hackathon-cmm-showcase/build/attested/examples_out/rides/jordan-lee-1793067141/matches/150/application_package.md"}
+{"ts": "2026-10-27T02:19:34+00:00", "actor": "applier", "message": "Pursuit #4 prepared: /home/hatch/workspace/goals/meta-hackathon-cmm-showcase/build/attested/examples_out/rides/jordan-lee-1793067141/matches/3/application_package.md"}
+{"ts": "2026-10-27T02:19:34+00:00", "actor": "applier", "message": "Pursuit #5 prepared: /home/hatch/workspace/goals/meta-hackathon-cmm-showcase/build/attested/examples_out/rides/jordan-lee-1793067141/matches/2/application_package.md"}
+{"ts": "2026-10-27T02:19:34+00:00", "actor": "applier", "message": "Pursuit #6 prepared: /home/hatch/workspace/goals/meta-hackathon-cmm-showcase/build/attested/examples_out/rides/jordan-lee-1793067141/matches/179/application_package.md"}
+{"ts": "2026-10-27T02:19:34+00:00", "actor": "system", "message": "Call queue written (13 judged, 6 pursuits queued)"}

@@ -1,0 +1,2 @@
+# Jordan Lee — Data Engineer
+Python and PySpark pipelines on EMR. Built real-time Kafka streaming platform and Snowpark DataFrame applications. Improved pipeline throughput by 40%. Terraform modules for AWS infrastructure.
