@@ -43,7 +43,17 @@ def classify(employment_type="", location="", source="", text=""):
     else:
         job_type = "unknown"
     loc = (location or "").lower()
-    if source == "remoteok" or "remote" in loc:
+    # Strong remote markers in the JD's opening lines count too — a
+    # remote contract whose location field just says "United States"
+    # (LinkedIn's habit) is remote work, not on-site. Deliberately
+    # narrow phrases: a passing mention like "1 day/week remote" inside
+    # an on-site role must NOT flip it.
+    remote_markers = ("remote contract", "location: remote",
+                      "fully remote", "100% remote", "distance remote",
+                      "remote position", "remote role", "remote job",
+                      "workplace: remote", "remote, us", "remote (us")
+    if source == "remoteok" or "remote" in loc \
+            or any(m in blob for m in remote_markers):
         workplace = "remote"
     elif "hybrid" in loc or "hybrid" in blob:
         workplace = "hybrid"
@@ -97,12 +107,19 @@ def _linkedin_guest(row):
 
 def _linkedin(row):
     """Signed-in scout deposit: full job records, JD included — nothing
-    like the guest source's ID-only stubs."""
+    like the guest source's ID-only stubs. When the scout captured
+    LinkedIn's workplace badge (Remote / Hybrid / On-site), it rides at
+    the front of the location so classify() reads the stated workplace
+    instead of guessing it from the city."""
     p = json.loads(row["raw"])
     jd = p.get("description_text") or html_to_text(p.get("description_html", ""))
+    location = p.get("location", "")
+    workplace = (p.get("workplace") or "").strip()
+    if workplace and workplace.lower() not in location.lower():
+        location = f"{workplace} — {location}" if location else workplace
     return dict(
         title=p.get("title", ""), company=p.get("company", ""),
-        location=p.get("location", ""),
+        location=location,
         employment_type=p.get("employment_type", ""),
         posted_at=p.get("posted_at", ""),
         apply_url=p.get("apply_url") or row["url"] or "",

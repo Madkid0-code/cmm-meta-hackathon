@@ -79,6 +79,21 @@ class TestLinkedInSource(unittest.TestCase):
         doctor = [m for m in self.events if "signed-in scout" in m]
         self.assertTrue(doctor)
 
+    def test_scout_workplace_badge_rides_into_location(self):
+        now = datetime.now(timezone.utc).isoformat(timespec="seconds")
+        job = _job("444", now)
+        job["workplace"] = "Remote"
+        job["location"] = "United States"
+        self._deposit("scout-3.json", [job])
+        sweeper.sweep(self.db, store, self._config(), self.emit)
+        parser.parse_all(self.db, store, self.emit)
+        row = self.db.execute(
+            "SELECT * FROM job_postings WHERE source='linkedin'").fetchone()
+        self.assertTrue(row["location"].startswith("Remote"))
+        _, w = parser.classify(row["employment_type"], row["location"],
+                               row["source"], row["jd_text"])
+        self.assertEqual(w, "remote")
+
     def test_removed_sources_and_linkedin_route(self):
         self.assertNotIn("remoteok", sweeper.SOURCES)
         self.assertNotIn("arbeitnow", sweeper.SOURCES)

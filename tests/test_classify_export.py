@@ -34,6 +34,28 @@ class ClassifyTests(unittest.TestCase):
         t, w = parser.classify("", "", "arbeitnow", "")
         self.assertEqual(t, "unknown")
 
+    def test_jd_remote_markers_count(self):
+        # LinkedIn habit: location says only "United States" while the
+        # JD's opening states the remote contract plainly.
+        _, w = parser.classify(
+            "Contract", "United States", "linkedin",
+            "DATA Distance REMOTE CONTRACT Data Engineer role. "
+            "Build pipelines in Python and SQL.")
+        self.assertEqual(w, "remote")
+        _, w = parser.classify(
+            "Contract", "United States", "linkedin",
+            "Data Engineer. Duration: Contract Location: REMOTE. "
+            "Own the data lifecycle end to end.")
+        self.assertEqual(w, "remote")
+
+    def test_partial_remote_mention_does_not_flip_onsite(self):
+        # An on-site role that allows one remote day is still on-site.
+        _, w = parser.classify(
+            "Full-time", "Los Angeles Metropolitan Area", "linkedin",
+            "Schedule: Full-time, contract; long-term opportunity. "
+            "Work Type: 4 days/week on site; 1 day/week remote.")
+        self.assertEqual(w, "onsite")
+
 
 class ExportTests(unittest.TestCase):
     MD = "# Alex Rivera\n\n## Professional Summary\nData engineer.\n\n- Built pipelines on EMR\n- SQL models in Snowflake\n"

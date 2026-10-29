@@ -84,8 +84,15 @@ def run(form_path, out_dir, reader_cap=READER_CAP, build_top=BUILD_TOP,
     parser.parse_all(db, store, emit)
 
     match_skills = form["search"]["match_skills"]
+    # The audit queue only draws from the sweep config's ACTIVE sources:
+    # a source the seeker removed stops feeding the Reader, even though
+    # its older postings stay in the store (owner's source cuts,
+    # 2026-10-28 — the removed boards' backlog must not eat the cap).
+    active_sources = set(json.loads(config["sources"]))
     pending = []
     for posting in store.postings_without_match(db, candidate):
+        if posting["source"] not in active_sources:
+            continue
         if len(posting["jd_text"] or "") < 200:
             continue
         hits = parser.keyword_hits(posting, match_skills)
