@@ -20,6 +20,7 @@ import os
 ROUTES = {
     "dice": "dice",
     "linkedin_guest": "linkedin",
+    "linkedin": "linkedin",
     "remoteok": "board",
     "arbeitnow": "board",
 }

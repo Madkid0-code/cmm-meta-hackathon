@@ -1,61 +1,60 @@
 {
+ "name": "Alex Rivera",
  "attested_skills": [
   {
-   "evidence": "9 years, primary language across all roles",
-   "term": "Python"
+   "term": "Python",
+   "evidence": "9 years, primary language across all roles"
   },
   {
-   "evidence": "9 years, complex analytics and pipeline queries",
-   "term": "SQL"
+   "term": "SQL",
+   "evidence": "9 years, complex analytics and pipeline queries"
   },
   {
-   "evidence": "6 years building batch pipelines on Amazon EMR",
-   "term": "PySpark"
+   "term": "PySpark",
+   "evidence": "6 years building batch pipelines on Amazon EMR"
   },
   {
-   "evidence": "6 years, production clusters",
-   "term": "Amazon EMR"
+   "term": "Amazon EMR",
+   "evidence": "6 years, production clusters"
   },
   {
-   "evidence": "5 years, schema management",
-   "term": "AWS Glue Catalog"
+   "term": "AWS Glue Catalog",
+   "evidence": "5 years, schema management"
   },
   {
-   "evidence": "7 years, data lake storage",
-   "term": "Amazon S3"
+   "term": "Amazon S3",
+   "evidence": "7 years, data lake storage"
   },
   {
-   "evidence": "4 years, ACID tables on S3",
-   "term": "Delta Lake"
+   "term": "Delta Lake",
+   "evidence": "4 years, ACID tables on S3"
   },
   {
-   "evidence": "5 years, DAG authoring and operations",
-   "term": "Apache Airflow"
+   "term": "Apache Airflow",
+   "evidence": "5 years, DAG authoring and operations"
   },
   {
-   "evidence": "3 years, SQL models and SnowSQL only",
-   "term": "Snowflake"
+   "term": "Snowflake",
+   "evidence": "3 years, SQL models and SnowSQL only"
   },
   {
-   "evidence": "2 years, transformation models and tests",
-   "term": "dbt"
+   "term": "dbt",
+   "evidence": "2 years, transformation models and tests"
+  },
+  {
+   "term": "snowpark",
+   "evidence": "3 years"
   }
  ],
  "hard_boundaries": [
-  "Never used Snowpark in production",
   "No Kafka or streaming production experience",
   "No Terraform \u2014 infrastructure was managed by a platform team"
  ],
- "name": "Alex Rivera",
- "note": "FICTIONAL demo persona. Every fact below is invented for the demo.",
- "raw_resume_file": "raw_resume.md",
  "search": {
-  "contract_only": true,
   "keywords": [
    "data engineer pyspark",
    "data engineer python sql"
   ],
-  "location": "United States",
   "match_skills": [
    "python",
    "sql",
@@ -63,16 +62,21 @@
    "tableau",
    "power bi"
   ],
+  "location": "United States",
+  "job_types": [
+   "contract",
+   "full_time"
+  ],
+  "workplace": [
+   "remote"
+  ],
+  "contract_only": false,
   "posted_within_hours": 24,
   "sources": [
    "dice",
-   "remoteok",
-   "arbeitnow",
-   "linkedin_guest"
-  ],
-  "job_types": [
-   "contract"
-  ],
-  "workplace": []
- }
+   "linkedin"
+  ]
+ },
+ "note": "FICTIONAL demo persona. Every fact below is invented for the demo.",
+ "raw_resume_file": "raw_resume.md"
 }

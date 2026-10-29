@@ -107,7 +107,7 @@ def add_config(db, form):
             form["search"].get("location", "United States"),
             1 if form["search"].get("contract_only") else 0,
             int(form["search"].get("posted_within_hours", 24)),
-            json.dumps(form["search"].get("sources", ["dice", "remoteok", "arbeitnow"])),
+            json.dumps(form["search"].get("sources", ["dice", "linkedin"])),
             now_iso(),
         ),
     )

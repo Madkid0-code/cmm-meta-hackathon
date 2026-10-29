@@ -10,14 +10,24 @@ Mirrors the production CMM sweeper model:
   Dedupe is (source, external_id); a second layer (company + title) runs in
   the parser, like production.
 
-Sources (all public, no login, no credentials):
+Sources (owner-directed, 2026-10-28 — two sources, both strong):
 - dice:      server-rendered search payload + public detail pages.
-- remoteok:  public JSON API.
-- arbeitnow: public JSON API.
-- linkedin_guest: public guest endpoint; large platforms rate-limit
-  datacenter IPs, so this source is attempt-and-degrade by design.
+- linkedin:  SIGNED-IN LinkedIn, the advanced source. The guest endpoint
+  returns ID-only stubs and cannot filter for contract jobs, so it was
+  retired. Instead, a signed-in scout (a browser agent working in the
+  seeker's own LinkedIn session — the production CMM pattern) searches
+  with the Contract + Past-24h filters applied and deposits full job
+  records (title, company, location, type, JD text) as fragment files
+  in <store>/linkedin_inbox/. This collector ingests those deposits.
+  No credentials ever enter this codebase or the store; the session
+  lives only in the scout's browser.
+
+RemoteOK and Arbeitnow were removed on the owner's order (thin,
+mostly non-contract feeds). Their parsers remain in parser.py so rows
+already in a store still parse; they are never fetched again.
 """
 import json
+import os
 import re
 import urllib.parse
 import urllib.request
@@ -92,7 +102,7 @@ def _dice_description(html):
         pos = t.end()
 
 
-def dice_search(config, per_keyword=6, detail_cap=10):
+def dice_search(config, db=None, per_keyword=6, detail_cap=10):
     """Returns list of raw payload dicts (card + full description HTML)."""
     posted_map = {12: "ONE", 24: "ONE", 48: "THREE", 72: "THREE",
                   168: "SEVEN"}
@@ -136,50 +146,64 @@ def _within(iso_or_ts, hours):
     return dt >= datetime.now(timezone.utc) - timedelta(hours=hours)
 
 
-def remoteok_search(config):
-    data = json.loads(fetch("https://remoteok.com/api"))
-    out = []
-    for job in data[1:]:
-        if not _within(job.get("date", ""), int(config["posted_within_hours"]) * 7):
-            continue  # remoteok feed is thin; window widened deliberately
-        out.append(job)
+def _store_dir(db):
+    """Directory holding the store's database file (the inbox lives
+    beside it). Falls back to the cwd for in-memory stores."""
+    try:
+        for row in db.execute("PRAGMA database_list").fetchall():
+            if row[1] == "main" and row[2]:
+                return os.path.dirname(os.path.abspath(row[2]))
+    except Exception:
+        pass
+    return os.getcwd()
+
+
+def linkedin_search(config, db=None):
+    """Ingest signed-in scout deposits from <store>/linkedin_inbox/.
+
+    Each fragment is one scout run: {"searched_keywords": [...],
+    "jobs": [{job_id, title, company, location, employment_type,
+    posted_at, apply_url, description_text}]}. Fragments whose searched
+    keywords do not overlap this config's keywords are skipped (a stale
+    deposit from an older search must not leak into a new one). Deposits
+    stay on disk after ingestion — insert_raw dedupes on
+    (source, external_id), so re-reading a fragment is harmless.
+    """
+    inbox = os.path.join(_store_dir(db), "linkedin_inbox")
+    if not os.path.isdir(inbox):
+        return []
+    wanted = {k.strip().lower() for k in json.loads(config["keywords"])}
+    hours = int(config["posted_within_hours"])
+    out, seen = [], set()
+    for name in sorted(os.listdir(inbox)):
+        if not name.endswith(".json"):
+            continue
+        try:
+            with open(os.path.join(inbox, name)) as f:
+                frag = json.load(f)
+        except Exception:
+            continue
+        frag_keys = {str(k).strip().lower()
+                     for k in frag.get("searched_keywords") or []}
+        if frag_keys and not (frag_keys & wanted):
+            continue
+        for job in frag.get("jobs") or []:
+            ext = str(job.get("job_id") or "")
+            if not ext or ext in seen:
+                continue
+            if job.get("posted_at") and not _within(job["posted_at"], hours):
+                continue
+            seen.add(ext)
+            out.append(job)
     return out
-
-
-def arbeitnow_search(config):
-    data = json.loads(fetch("https://www.arbeitnow.com/api/job-board-api"))
-    return [
-        j for j in data.get("data", [])
-        if _within(j.get("created_at", 0), int(config["posted_within_hours"]) * 7)
-    ]
-
-
-# ---------------------------------------------------------------- LinkedIn guest
-
-def linkedin_guest_search(config):
-    q = urllib.parse.urlencode({
-        "keywords": json.loads(config["keywords"])[0],
-        "location": config["location"],
-        "f_TPR": f"r{int(config['posted_within_hours']) * 3600}",
-        "start": 0,
-    })
-    html = fetch(
-        f"https://www.linkedin.com/jobs-guest/jobs/api/seeMoreJobPostings/search?{q}")
-    jobs = []
-    for m in re.finditer(r'data-entity-urn="urn:li:jobPosting:(\d+)"', html):
-        jobs.append({"job_id": m.group(1)})
-    return jobs
 
 
 SOURCES = {
     "dice": (dice_search, lambda p: p["card"].get("guid") or p["card"].get("id"),
              lambda p: p["card"].get("detailsPageUrl")),
-    "remoteok": (remoteok_search, lambda p: str(p.get("id")),
-                 lambda p: p.get("url")),
-    "arbeitnow": (arbeitnow_search, lambda p: p.get("slug") or p.get("url"),
-                  lambda p: p.get("url")),
-    "linkedin_guest": (linkedin_guest_search, lambda p: p.get("job_id"),
-                       lambda p: f"https://www.linkedin.com/jobs/view/{p.get('job_id')}"),
+    "linkedin": (linkedin_search, lambda p: str(p.get("job_id") or ""),
+                 lambda p: p.get("apply_url")
+                 or f"https://www.linkedin.com/jobs/view/{p.get('job_id')}"),
 }
 
 
@@ -192,7 +216,7 @@ def sweep(db, store, config, emit):
             continue
         fn, ext_of, url_of = SOURCES[name]
         try:
-            payloads = fn(config)
+            payloads = fn(config, db)
         except Exception as e:
             emit("sweeper", f"DOCTOR: source {name} unavailable ({type(e).__name__}) — fleet continues")
             counts[name] = 0
@@ -206,4 +230,9 @@ def sweep(db, store, config, emit):
             new += 1 if is_new else 0
         counts[name] = new
         emit("sweeper", f"{name}: {len(payloads)} fetched, {new} new raw postings")
+        if name == "linkedin" and not payloads:
+            emit("sweeper", "DOCTOR: linkedin — no signed-in scout deposit "
+                            "in the inbox yet; the signed-in scout pulls "
+                            "fresh contract jobs on the seeker's own "
+                            "LinkedIn session and deposits them here")
     return counts

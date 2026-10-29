@@ -95,11 +95,26 @@ def _linkedin_guest(row):
         apply_url=row["url"] or "", jd_text="")
 
 
+def _linkedin(row):
+    """Signed-in scout deposit: full job records, JD included — nothing
+    like the guest source's ID-only stubs."""
+    p = json.loads(row["raw"])
+    jd = p.get("description_text") or html_to_text(p.get("description_html", ""))
+    return dict(
+        title=p.get("title", ""), company=p.get("company", ""),
+        location=p.get("location", ""),
+        employment_type=p.get("employment_type", ""),
+        posted_at=p.get("posted_at", ""),
+        apply_url=p.get("apply_url") or row["url"] or "",
+        jd_text=jd)
+
+
 PARSERS = {
     "dice": _dice,
     "remoteok": _remoteok,
     "arbeitnow": _arbeitnow,
     "linkedin_guest": _linkedin_guest,
+    "linkedin": _linkedin,
 }
 
 

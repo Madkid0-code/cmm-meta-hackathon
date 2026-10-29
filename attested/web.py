@@ -143,7 +143,7 @@ def _read_events(path, limit=90):
 
 SOURCE_NAMES = {"dice": "Dice", "remoteok": "RemoteOK",
                 "arbeitnow": "Arbeitnow", "linkedin_guest": "LinkedIn",
-                "linkedin": "LinkedIn"}
+                "linkedin": "LinkedIn (signed in)"}
 
 
 def human_feed(events):
@@ -360,7 +360,7 @@ def human_feed(events):
 
 # ---------------------------------------------------------------- state
 
-KNOWN_SOURCES = ("dice", "remoteok", "arbeitnow", "linkedin_guest")
+KNOWN_SOURCES = ("dice", "linkedin")
 
 
 class UI:
@@ -1375,7 +1375,7 @@ function openRide(){
   document.querySelectorAll('.fwp').forEach(c=>c.checked=wps.includes(c.value));
   document.getElementById('fHours').value=String((f.search||{}).posted_within_hours||24);
   const srcs=(f.search||{}).sources||[];
-  document.getElementById('fSources').innerHTML=['dice','remoteok','arbeitnow','linkedin_guest'].map(s=>'<label style="font-weight:400"><input type="checkbox" class="fsrc" value="'+s+'"'+(srcs.includes(s)?' checked':'')+'> '+s+'</label>').join('');
+  document.getElementById('fSources').innerHTML=['dice','linkedin'].map(s=>'<label style="font-weight:400"><input type="checkbox" class="fsrc" value="'+s+'"'+(srcs.includes(s)?' checked':'')+'> '+s+'</label>').join('');
  }
  v.scrollIntoView({behavior:'smooth'});
 }
@@ -1449,7 +1449,7 @@ function populateSearch(){
  document.querySelectorAll('.swp').forEach(c=>c.checked=wps.includes(c.value));
  document.getElementById('sHours').value=String(sp.posted_within_hours||24);
  const srcs=sp.sources||[];
- document.getElementById('sSources').innerHTML=['dice','remoteok','arbeitnow','linkedin_guest'].map(s=>'<label style="font-weight:400"><input type="checkbox" class="ssrc" value="'+s+'"'+(srcs.includes(s)?' checked':'')+'> '+s+'</label>').join('');
+ document.getElementById('sSources').innerHTML=['dice','linkedin'].map(s=>'<label style="font-weight:400"><input type="checkbox" class="ssrc" value="'+s+'"'+(srcs.includes(s)?' checked':'')+'> '+s+'</label>').join('');
 }
 document.getElementById('searchSec').addEventListener('input',()=>{searchDirty=true;});
 document.getElementById('saveSearch').onclick=async()=>{
