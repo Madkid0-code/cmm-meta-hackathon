@@ -139,8 +139,10 @@ and stopped cold by any security checkpoint.
 In this repository, the agent layer is represented by its two contracts:
 the scout **deposit format** (`linkedin_inbox/*.json`, ingested by
 `attested/sweeper.py`) and the **apply-request flag** the UI sets for the
-executor. In the live demo those seats are worked by the team's browser
-agents so the behaviour can be watched end to end. In the product, the
+executor. In the live demo those seats are worked by **Muse browser
+agents** (Meta's Muse agent platform) so the behaviour can be watched
+end to end — Muse Spark does the thinking; Muse browser agents do the
+acting. In the product, the
 Scout ships as a small add-on in the seeker's own browser — the session
 never leaves the seeker's machine, and no LinkedIn password is ever
 shared with or stored by CMM. (For the done-for-you service model, the
