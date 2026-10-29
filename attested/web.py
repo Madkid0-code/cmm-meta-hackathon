@@ -1053,10 +1053,10 @@ details.rawlog{margin-top:4px}details.rawlog summary{cursor:pointer;color:var(--
  <div class="brand"><div class="mark">⚡</div><div><div class="wm">CMM</div><div class="sub">Candidate Marketing Machine</div></div></div>
  <div class="navlabel">YOUR HUNT</div>
  <nav>
+  <a href="#" data-nav="profile"><span class="ni">👤</span>Your profile</a>
   <a href="#" data-nav="main" class="on"><span class="ni">⌂</span>Today</a>
   <a href="#" data-nav="main" data-scroll="boardSec"><span class="ni">▦</span>Your pipeline</a>
   <a href="#" data-nav="targets"><span class="ni">🎯</span>Live Market Targets</a>
-  <a href="#" data-nav="profile"><span class="ni">👤</span>Your profile</a>
   <a href="#" data-nav="safety"><span class="ni">🛡️</span>Safety check</a>
  </nav>
  <div class="sidecard"><div class="t">🛡️ The honesty rule</div><div class="x">The LLM proposes. The code disposes. Nothing is ever submitted without your click.</div></div>
@@ -1066,7 +1066,6 @@ details.rawlog{margin-top:4px}details.rawlog summary{cursor:pointer;color:var(--
  <div class="topbar">
   <div><div class="dateline" id="dateLine"></div><h1 class="greet" id="greet">Your job hunt</h1></div>
   <div class="topbtns">
-   <button class="btnT" id="rideBtn">✨ Try it with your own profile</button>
    <button class="btn2" id="homeBtn" style="display:none">← Back to demo results</button>
   </div>
  </div>
@@ -1228,7 +1227,6 @@ function render(){
  const rf=document.getElementById('runFixture'),rs=document.getElementById('runSweep');
  rf.disabled=!S.can_run||S.running_fixture;rs.disabled=!S.can_run||S.running_sweep;
  document.getElementById('runNote').textContent=S.can_run?'':"You're viewing the real results. The live buttons need the API key (or the dev preview).";
- document.getElementById('rideBtn').style.display=S.mode==='ride'?'none':'';
  document.getElementById('homeBtn').style.display=S.mode==='ride'?'':'none';
  const runningNow=S.running.sweep||S.running.fixture;
  rf.style.display=runningNow||S.mode==='ride'?'none':'';
@@ -1345,7 +1343,6 @@ async function submitRide(){
  }catch(e){err.textContent='Could not reach the server.';err.style.display='block';}
  btn.disabled=false;btn.textContent='▶ Start my search';
 }
-document.getElementById('rideBtn').onclick=openRide;
 document.getElementById('cancelRide').onclick=()=>document.getElementById('rideView').classList.remove('open');
 document.getElementById('addSkill').onclick=()=>document.getElementById('fSkills').appendChild(skillRow('',''));
 document.getElementById('startRide').onclick=submitRide;

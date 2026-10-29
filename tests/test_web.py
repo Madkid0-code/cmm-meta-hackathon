@@ -220,6 +220,17 @@ class TestServer(unittest.TestCase):
         self.assertIn('id="saveProfile"', body)
         self.assertIn('id="pSkills"', body)
 
+    def test_profile_first_in_sidebar_and_no_ride_button(self):
+        # Owner's account model (2026-10-28): one login = one person, so
+        # there is no 'try it with another profile' entry point, and Your
+        # profile is the first button in the left sidebar, before Today.
+        status, body = self._get("/")
+        self.assertEqual(status, 200)
+        self.assertNotIn("Try it with your own profile", body)
+        self.assertNotIn('id="rideBtn"', body)
+        self.assertLess(body.index('data-nav="profile"'),
+                        body.index('data-nav="main"'))
+
     def test_page_and_doc(self):
         status, body = self._get("/")
         self.assertEqual(status, 200)
