@@ -34,11 +34,11 @@ immutable handoff chain, exactly like production.
    the way that source actually allows:
    - **Dice — plain code, in the product.** The sweeper reads Dice's search
      and detail pages directly with the config's filters. No login, no AI.
-   - **LinkedIn — a browser agent, signed in as the seeker.** LinkedIn's
+   - **LinkedIn — a Muse browser agent, signed in as the seeker.** LinkedIn's
      real search (contract filter, last-24-hours, full job descriptions)
      exists only inside a member's signed-in session; its guest endpoint
      returns ID-only stubs and cannot filter for contract work, so it was
-     retired. Instead, a **scout** — a browser agent working in the
+     retired. Instead, a **scout** — a Muse browser agent working in the
      seeker's own signed-in LinkedIn session, read-only, capped, with an
      identity guard and a hard stop at any security checkpoint — runs the
      config's filters and deposits full job records into the store's
@@ -92,7 +92,7 @@ immutable handoff chain, exactly like production.
    submits as the seeker — the demo persona is fictional, and applying as
    a fictional person to real employers would be fraud. In the live
    deployment the loop closes through the agent layer: the web UI records
-   an **apply request** on the seeker's click, and a browser-agent
+   an **apply request** on the seeker's click, and a Muse browser-agent
    executor working in the seeker's own signed-in Dice session performs
    the submission and brings back the employer's confirmation verbatim
    (routes that apply on a company's own site are reported honestly as
@@ -120,18 +120,18 @@ here is "the AI does everything":
 | Stage | Powered by | Where it runs |
 |---|---|---|
 | Sweeper — Dice | Plain code | Inside the product |
-| Sweeper — LinkedIn (**the Scout**) | **Browser agent** in the seeker's own signed-in session | The seeker's browser session; deposits land in the product's `linkedin_inbox/` |
+| Sweeper — LinkedIn (**the Scout**) | **Muse browser agent** in the seeker's own signed-in session | The seeker's browser session; deposits land in the product's `linkedin_inbox/` |
 | Parser · Keep rule · **Verifier** | Plain code — never an LLM | Inside the product |
 | Reader · Builder | **Muse Spark 1.3** (Meta Model API) | Called by the product |
 | Applier — packages & outcome tracking | Plain code | Inside the product |
-| Applier — the submission itself | **Browser agent** on the seeker's own signed-in session, on the seeker's click | The seeker's browser session |
+| Applier — the submission itself | **Muse browser agent** on the seeker's own signed-in session, on the seeker's click | The seeker's browser session |
 | The final decision | **The human** | — |
 
-Why browser agents at all? Because two moments in a job search can only
+Why Muse browser agents at all? Because two moments in a job search can only
 happen *as the member*: LinkedIn's contract-filtered, hours-fresh search
 exists only inside a signed-in session, and a Dice application can only
 be submitted by the signed-in seeker. An API key cannot be a member. So
-the parts that need an identity are done by a browser agent sitting in
+the parts that need an identity are done by a Muse browser agent sitting in
 the seeker's own session — read-only while scouting, acting only on an
 explicit Apply click while applying, identity-checked before it moves,
 and stopped cold by any security checkpoint.
@@ -226,7 +226,7 @@ python3 run_web.py 8765                # http://127.0.0.1:8765
   confirmation, in-flight, or not-applied with the honest reason).
 - **🧠 How CMM works** — a page inside the product that explains the
   machine to the seeker (and to judges): every worker, what powers it
-  (plain code / Muse Spark / browser agent / the human), and a live
+  (plain code / Muse Spark / Muse browser agent / the human), and a live
   count from the account's own pipeline on each step.
 - **Live event stream** — every agent and guardrail event, actor-colored,
   with Muse Spark's reasoning progress visible while it thinks. Two live
