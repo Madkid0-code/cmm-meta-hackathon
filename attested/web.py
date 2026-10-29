@@ -598,16 +598,13 @@ class UI:
         }
         return form, None
 
-    def update_profile(self, payload):
-        """The Your-profile tab's Save: rewrite the CURRENT form in place
-        (attested skills, hard boundaries, and the whole sweep spec), and
-        re-render the attested profile beside the store, so the very next
-        Scan for New Roles shops with the new settings. Nothing already
-        found, built, or applied is touched. Preserves form keys the
-        editor does not manage (note, raw_resume_file)."""
-        if self.readonly():
-            return False, "View-only preview — profile editing is disabled."
-        form, err = self._form_from_payload(payload)
+    def _save_merged_form(self, merged_payload, event_message):
+        """Validate a full payload (profile + search merged over the
+        current form), write it back to the current form file, re-render
+        the attested profile beside the store, and log the change.
+        Preserves form keys no editor manages (note, raw_resume_file).
+        Nothing already found, built, or applied is touched."""
+        form, err = self._form_from_payload(merged_payload)
         if form is None:
             return False, err
         try:
@@ -620,13 +617,55 @@ class UI:
             json.dump(form, f, indent=1)
         with open(os.path.join(self.out_dir, "profile_attested.md"), "w") as f:
             f.write(profile.render_profile_md(form))
-        self._append_event(
-            "system",
-            f"Profile updated from the website — {form['name']}: "
-            f"{len(form['attested_skills'])} attested skills, search is now "
-            f"{' / '.join(form['search']['keywords'])} "
-            f"({form['search']['location']}). The next scan uses these.")
+        self._append_event("system", event_message(form))
         return True, "saved"
+
+    def _current_payload(self):
+        """The current form, shaped like an editor payload."""
+        try:
+            cur = profile.load_form(self.form_path)
+        except Exception:
+            cur = {"name": "", "attested_skills": [], "hard_boundaries": [],
+                   "search": {}}
+        return {"name": cur.get("name", ""),
+                "attested_skills": cur.get("attested_skills", []),
+                "hard_boundaries": cur.get("hard_boundaries", []),
+                "search": cur.get("search", {})}
+
+    def update_profile(self, payload):
+        """The Your-profile button's Save my profile: ONLY the person
+        changes (name, attested skills, hard boundaries). The search
+        settings are carried over untouched — search is a separate
+        button with its own save (owner, 2026-10-28)."""
+        if self.readonly():
+            return False, "View-only preview — profile editing is disabled."
+        merged = self._current_payload()
+        for key in ("name", "attested_skills", "hard_boundaries"):
+            if key in payload:
+                merged[key] = payload[key]
+        return self._save_merged_form(
+            merged,
+            lambda form: f"Profile updated from the website — "
+                         f"{form['name']}: {len(form['attested_skills'])} "
+                         f"attested skills saved.")
+
+    def update_search(self, payload):
+        """The Your-search button's Save my search: ONLY the sweep
+        changes (phrases, match skills, location, sources, job types,
+        workplace, posted-within). The person's attested profile is
+        carried over untouched, and the next Scan for New Roles shops
+        with the new settings."""
+        if self.readonly():
+            return False, "View-only preview — search editing is disabled."
+        merged = self._current_payload()
+        search = payload.get("search") or payload
+        merged["search"] = search
+        return self._save_merged_form(
+            merged,
+            lambda form: f"Search updated from the website — "
+                         f"{' / '.join(form['search']['keywords'])} "
+                         f"({form['search']['location']}). "
+                         f"The next scan uses these.")
 
     # -- the ride: a visitor's own form -> their own store -> full flow --
     def start_ride(self, payload):
@@ -1054,6 +1093,7 @@ details.rawlog{margin-top:4px}details.rawlog summary{cursor:pointer;color:var(--
  <div class="navlabel">YOUR HUNT</div>
  <nav>
   <a href="#" data-nav="profile"><span class="ni">👤</span>Your profile</a>
+  <a href="#" data-nav="search"><span class="ni">🔎</span>Your search</a>
   <a href="#" data-nav="main" class="on"><span class="ni">⌂</span>Today</a>
   <a href="#" data-nav="main" data-scroll="boardSec"><span class="ni">▦</span>Your pipeline</a>
   <a href="#" data-nav="targets"><span class="ni">🎯</span>Live Market Targets</a>
@@ -1141,23 +1181,37 @@ details.rawlog{margin-top:4px}details.rawlog summary{cursor:pointer;color:var(--
   <section class="card" id="profileSec">
    <div class="cardhead" style="font-size:17px">Your Attested Profile</div>
    <div style="margin-top:12px" id="skills"></div><div class="never" id="never"></div>
-   <div class="spec" id="spec"></div>
    <div style="border-top:1px solid #EEF4F0;margin-top:16px;padding-top:14px">
-    <div class="cardhead" style="font-size:15px">✏️ Update your profile &amp; your search</div>
-    <p class="shieldnote">Change anything here and hit Save — your attested profile and your search (the sweep) update together, and the next <b>Scan for New Roles</b> uses the new settings. Jobs already found, resumes already built, and applications already sent are not changed.</p>
+    <div class="cardhead" style="font-size:15px">✏️ Update your profile</div>
+    <p class="shieldnote">This is you — the skills you can defend and the lines you will not cross. Change anything and hit <b>Save my profile</b>. Your search settings live under <b>Your search</b>, with their own save. Jobs already found, resumes already built, and applications already sent are not changed.</p>
     <div class="fgrid">
      <div class="fld"><label>Your name</label><input type="text" id="pName"></div>
-     <div class="fld"><label>Where should it look? <span class="hint">location</span></label><input type="text" id="pLoc"></div>
      <div class="fld" style="grid-column:1/-1"><label>Your skills — claim only what you can defend <span class="hint">skill + your proof</span></label><div id="pSkills"></div><button class="btn2" id="addPSkill" type="button">＋ Add a skill</button></div>
      <div class="fld" style="grid-column:1/-1"><label>Hard boundaries <span class="hint">one per line — things you have NOT done and will not claim</span></label><textarea id="pBounds" rows="3"></textarea></div>
-     <div class="fld"><label>Search phrases <span class="hint">comma-separated</span></label><input type="text" id="pKeywords"></div>
-     <div class="fld"><label>Match skills <span class="hint">comma-separated — a role stays in only if it asks for ≥2 of these</span></label><input type="text" id="pMatch"></div>
-     <div class="fld"><label>Look on</label><div class="srcs" id="pSources"></div></div>
-     <div class="fld"><label>Job type</label><div class="srcs"><label style="font-weight:400"><input type="checkbox" class="pjt" value="contract"> Contract</label><label style="font-weight:400"><input type="checkbox" class="pjt" value="full_time"> Full-time</label><label style="font-weight:400"><input type="checkbox" class="pjt" value="part_time"> Part-time</label></div><span class="hint">none ticked = any type</span></div>
-     <div class="fld"><label>Workplace</label><div class="srcs"><label style="font-weight:400"><input type="checkbox" class="pwp" value="remote"> Remote</label><label style="font-weight:400"><input type="checkbox" class="pwp" value="hybrid"> Hybrid</label><label style="font-weight:400"><input type="checkbox" class="pwp" value="onsite"> On-site</label></div><span class="hint">none ticked = anywhere · posted in the last</span> <select id="pHours"><option value="12">12h</option><option value="24">24h</option><option value="48">48h</option><option value="72">3 days</option><option value="168">7 days</option></select></div>
     </div>
-    <div style="margin-top:14px;display:flex;gap:8px;align-items:center"><button class="btn1" id="saveProfile" type="button">💾 Save my profile &amp; search</button><span class="hint" id="profileSaved"></span></div>
+    <div style="margin-top:14px;display:flex;gap:8px;align-items:center"><button class="btn1" id="saveProfile" type="button">💾 Save my profile</button><span class="hint" id="profileSaved"></span></div>
     <div class="err" id="profileErr"></div>
+   </div>
+  </section>
+ </div>
+
+ <div id="viewSearch" style="display:none">
+  <section class="card" id="searchSec">
+   <div class="cardhead" style="font-size:17px">🔎 Your Search</div>
+   <div class="spec" id="spec"></div>
+   <div style="border-top:1px solid #EEF4F0;margin-top:16px;padding-top:14px">
+    <div class="cardhead" style="font-size:15px">✏️ Update your search</div>
+    <p class="shieldnote">This is what the machine shops for. Change anything and hit <b>Save my search</b> — the next <b>Scan for New Roles</b> uses the new settings. Your attested profile lives under <b>Your profile</b>, with its own save.</p>
+    <div class="fgrid">
+     <div class="fld"><label>Where should it look? <span class="hint">location</span></label><input type="text" id="sLoc"></div>
+     <div class="fld"><label>Search phrases <span class="hint">comma-separated</span></label><input type="text" id="sKeywords"></div>
+     <div class="fld"><label>Match skills <span class="hint">comma-separated — a role stays in only if it asks for ≥2 of these</span></label><input type="text" id="sMatch"></div>
+     <div class="fld"><label>Look on</label><div class="srcs" id="sSources"></div></div>
+     <div class="fld"><label>Job type</label><div class="srcs"><label style="font-weight:400"><input type="checkbox" class="sjt" value="contract"> Contract</label><label style="font-weight:400"><input type="checkbox" class="sjt" value="full_time"> Full-time</label><label style="font-weight:400"><input type="checkbox" class="sjt" value="part_time"> Part-time</label></div><span class="hint">none ticked = any type</span></div>
+     <div class="fld"><label>Workplace</label><div class="srcs"><label style="font-weight:400"><input type="checkbox" class="swp" value="remote"> Remote</label><label style="font-weight:400"><input type="checkbox" class="swp" value="hybrid"> Hybrid</label><label style="font-weight:400"><input type="checkbox" class="swp" value="onsite"> On-site</label></div><span class="hint">none ticked = anywhere · posted in the last</span> <select id="sHours"><option value="12">12h</option><option value="24">24h</option><option value="48">48h</option><option value="72">3 days</option><option value="168">7 days</option></select></div>
+    </div>
+    <div style="margin-top:14px;display:flex;gap:8px;align-items:center"><button class="btn1" id="saveSearch" type="button">💾 Save my search</button><span class="hint" id="searchSaved"></span></div>
+    <div class="err" id="searchErr"></div>
    </div>
   </section>
  </div>
@@ -1217,7 +1271,7 @@ function render(){
  document.getElementById('statPursuits').textContent=c.pursuits;
  document.getElementById('statApplied').textContent=c.applied||0;
  document.getElementById('rangeNote').textContent=(S.range_label||'All time')+(S.range==='today'?' — fresh every morning, resets at midnight ET':'')+' · the board below always shows everything still waiting for you, from every day';
- populateProfile();
+ populateProfile();populateSearch();
  document.getElementById('skills').innerHTML=S.skills.map(s=>'<p class="skill"><b>'+esc(s.term)+'</b> — '+esc(s.evidence)+'</p>').join('');
  document.getElementById('never').innerHTML='<b>Your hard boundaries:</b> '+S.boundaries.map(esc).join(' · ');
  const sp=S.spec;
@@ -1296,7 +1350,7 @@ function showDrawer(){
  }
 }
 // ---- sidebar views: one page per click, nothing stacked ----
-function showView(v){['viewMain','viewTargets','viewProfile','viewSafety'].forEach(id=>{document.getElementById(id).style.display=(id==='view'+v.charAt(0).toUpperCase()+v.slice(1)?'':'none');});document.querySelectorAll('nav a[data-nav]').forEach(a=>a.classList.toggle('on',a.dataset.nav===v));window.scrollTo({top:0,behavior:'smooth'});}
+function showView(v){['viewMain','viewTargets','viewProfile','viewSearch','viewSafety'].forEach(id=>{document.getElementById(id).style.display=(id==='view'+v.charAt(0).toUpperCase()+v.slice(1)?'':'none');});document.querySelectorAll('nav a[data-nav]').forEach(a=>a.classList.toggle('on',a.dataset.nav===v));window.scrollTo({top:0,behavior:'smooth'});}
 document.querySelectorAll('nav a[data-nav]').forEach(a=>a.onclick=e=>{e.preventDefault();showView(a.dataset.nav);if(a.dataset.scroll)setTimeout(()=>{const el=document.getElementById(a.dataset.scroll);if(el)el.scrollIntoView({behavior:'smooth'});},40);});
 document.querySelectorAll('.tab[data-t]').forEach(t=>t.onclick=()=>{tab=t.dataset.t;showDrawer();});
 document.getElementById('closeDrawer').onclick=()=>{cur=null;document.getElementById('drawer').style.display='none';};
@@ -1351,27 +1405,16 @@ document.getElementById('homeBtn').onclick=async()=>{await fetch('api/home',{met
 document.getElementById('buildMissing').onclick=async()=>{await fetch('api/build_missing',{method:'POST'});load();};
 // ---- stats range filter: Today | Yesterday | This month | All time ----
 document.querySelectorAll('.rangebtn').forEach(b=>b.onclick=()=>{range=b.dataset.range;document.querySelectorAll('.rangebtn').forEach(x=>x.classList.toggle('on',x===b));_lastSig='';load();});
-// ---- profile editor (Your profile tab): profile + sweep, saved together ----
+// ---- profile editor (Your profile): ONLY the person, 'Save my profile' ----
 let profSig='',profDirty=false;
 function populateProfile(){
  if(!S)return;
- const sig=JSON.stringify([S.candidate,S.skills,S.boundaries,S.spec]);
+ const sig=JSON.stringify([S.candidate,S.skills,S.boundaries]);
  if(sig===profSig||profDirty)return;
  profSig=sig;
- const sp=S.spec||{};
  document.getElementById('pName').value=S.candidate||'';
- document.getElementById('pLoc').value=sp.location||'';
  const sk=document.getElementById('pSkills');sk.innerHTML='';(S.skills||[]).forEach(s=>sk.appendChild(skillRow(s.term,s.evidence)));
  document.getElementById('pBounds').value=(S.boundaries||[]).join('\n');
- document.getElementById('pKeywords').value=(sp.keywords||[]).join(', ');
- document.getElementById('pMatch').value=(sp.match_skills||[]).join(', ');
- const jts=sp.job_types||(sp.contract_only?['contract']:[]);
- document.querySelectorAll('.pjt').forEach(c=>c.checked=jts.includes(c.value));
- const wps=sp.workplace||[];
- document.querySelectorAll('.pwp').forEach(c=>c.checked=wps.includes(c.value));
- document.getElementById('pHours').value=String(sp.posted_within_hours||24);
- const srcs=sp.sources||[];
- document.getElementById('pSources').innerHTML=['dice','remoteok','arbeitnow','linkedin_guest'].map(s=>'<label style="font-weight:400"><input type="checkbox" class="psrc" value="'+s+'"'+(srcs.includes(s)?' checked':'')+'> '+s+'</label>').join('');
 }
 document.getElementById('profileSec').addEventListener('input',()=>{profDirty=true;});
 document.getElementById('pSkills').addEventListener('click',()=>{profDirty=true;});
@@ -1381,14 +1424,44 @@ document.getElementById('saveProfile').onclick=async()=>{
  const saved=document.getElementById('profileSaved');saved.textContent='';
  const skills=[...document.querySelectorAll('#pSkills .skillrow')].map(r=>({term:r.querySelector('.st').value,evidence:r.querySelector('.se').value})).filter(s=>s.term.trim());
  const payload={name:document.getElementById('pName').value,attested_skills:skills,
-  hard_boundaries:document.getElementById('pBounds').value.split('\n'),
-  search:{keywords:document.getElementById('pKeywords').value.split(','),match_skills:document.getElementById('pMatch').value.split(','),location:document.getElementById('pLoc').value,job_types:[...document.querySelectorAll('.pjt:checked')].map(c=>c.value),workplace:[...document.querySelectorAll('.pwp:checked')].map(c=>c.value),posted_within_hours:parseInt(document.getElementById('pHours').value),sources:[...document.querySelectorAll('.psrc:checked')].map(c=>c.value)}};
+  hard_boundaries:document.getElementById('pBounds').value.split('\n')};
  const btn=document.getElementById('saveProfile');btn.disabled=true;btn.textContent='Saving…';
  try{const r=await fetch('api/profile',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});const j=await r.json();
-  if(j.saved){profDirty=false;profSig='';saved.textContent='Saved ✓ — the next Scan for New Roles uses these settings.';_lastSig='';load();}
+  if(j.saved){profDirty=false;profSig='';saved.textContent='Saved ✓';_lastSig='';load();}
   else{err.textContent=j.error||'Could not save.';err.style.display='block';}
  }catch(e){err.textContent='Could not reach the server.';err.style.display='block';}
- btn.disabled=false;btn.textContent='💾 Save my profile & search';
+ btn.disabled=false;btn.textContent='💾 Save my profile';
+};
+// ---- search editor (Your search): ONLY the sweep, 'Save my search' ----
+let searchSig='',searchDirty=false;
+function populateSearch(){
+ if(!S)return;
+ const sig=JSON.stringify(S.spec);
+ if(sig===searchSig||searchDirty)return;
+ searchSig=sig;
+ const sp=S.spec||{};
+ document.getElementById('sLoc').value=sp.location||'';
+ document.getElementById('sKeywords').value=(sp.keywords||[]).join(', ');
+ document.getElementById('sMatch').value=(sp.match_skills||[]).join(', ');
+ const jts=sp.job_types||(sp.contract_only?['contract']:[]);
+ document.querySelectorAll('.sjt').forEach(c=>c.checked=jts.includes(c.value));
+ const wps=sp.workplace||[];
+ document.querySelectorAll('.swp').forEach(c=>c.checked=wps.includes(c.value));
+ document.getElementById('sHours').value=String(sp.posted_within_hours||24);
+ const srcs=sp.sources||[];
+ document.getElementById('sSources').innerHTML=['dice','remoteok','arbeitnow','linkedin_guest'].map(s=>'<label style="font-weight:400"><input type="checkbox" class="ssrc" value="'+s+'"'+(srcs.includes(s)?' checked':'')+'> '+s+'</label>').join('');
+}
+document.getElementById('searchSec').addEventListener('input',()=>{searchDirty=true;});
+document.getElementById('saveSearch').onclick=async()=>{
+ const err=document.getElementById('searchErr');err.style.display='none';
+ const saved=document.getElementById('searchSaved');saved.textContent='';
+ const payload={search:{keywords:document.getElementById('sKeywords').value.split(','),match_skills:document.getElementById('sMatch').value.split(','),location:document.getElementById('sLoc').value,job_types:[...document.querySelectorAll('.sjt:checked')].map(c=>c.value),workplace:[...document.querySelectorAll('.swp:checked')].map(c=>c.value),posted_within_hours:parseInt(document.getElementById('sHours').value),sources:[...document.querySelectorAll('.ssrc:checked')].map(c=>c.value)}};
+ const btn=document.getElementById('saveSearch');btn.disabled=true;btn.textContent='Saving…';
+ try{const r=await fetch('api/search',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});const j=await r.json();
+  if(j.saved){searchDirty=false;searchSig='';saved.textContent='Saved ✓ — the next Scan for New Roles uses these settings.';_lastSig='';load();}
+  else{err.textContent=j.error||'Could not save.';err.style.display='block';}
+ }catch(e){err.textContent='Could not reach the server.';err.style.display='block';}
+ btn.disabled=false;btn.textContent='💾 Save my search';
 };
 // ---- apply from the website ----
 function applyHtml(){
@@ -1509,6 +1582,17 @@ def make_handler(ui):
                     self._json({"saved": False, "error": "Bad form data."}, 400)
                     return
                 ok, info = ui.update_profile(payload)
+                self._json({"saved": ok} if ok
+                           else {"saved": False, "error": info},
+                           200 if ok else 400)
+            elif self.path == "/api/search":
+                try:
+                    length = int(self.headers.get("Content-Length") or 0)
+                    payload = json.loads(self.rfile.read(length) or b"{}")
+                except (ValueError, json.JSONDecodeError):
+                    self._json({"saved": False, "error": "Bad form data."}, 400)
+                    return
+                ok, info = ui.update_search(payload)
                 self._json({"saved": ok} if ok
                            else {"saved": False, "error": info},
                            200 if ok else 400)

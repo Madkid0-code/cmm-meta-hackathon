@@ -185,29 +185,44 @@ class TestServer(unittest.TestCase):
         state = self.ui.state("nonsense")
         self.assertEqual(state["range"], "all")
 
-    def test_update_profile_saves_form_and_spec(self):
+    def test_update_profile_saves_person_only(self):
+        before = json.load(open(self.form_path))
         ok, info = self.ui.update_profile({
             "name": "Test Person",
             "attested_skills": [{"term": "Python", "evidence": "5 years"},
                                 {"term": "SQL", "evidence": "5 years"}],
-            "hard_boundaries": ["No Kafka"],
-            "search": {"keywords": ["data engineer python"],
-                       "match_skills": ["python", "sql"],
-                       "location": "Remote US",
-                       "job_types": ["full_time"], "workplace": ["remote"],
-                       "posted_within_hours": 48, "sources": ["dice"]}})
+            "hard_boundaries": ["No Kafka"]})
+        self.assertTrue(ok, info)
+        form = json.load(open(self.form_path))
+        self.assertEqual([s["term"] for s in form["attested_skills"]],
+                         ["Python", "SQL"])
+        self.assertEqual(form["hard_boundaries"], ["No Kafka"])
+        # Search carried over untouched — it has its own save. (The form
+        # validator normalizes the dict, adding empty job_types/workplace
+        # lists; the shopper's settings themselves must not change.)
+        for key in ("keywords", "match_skills", "location",
+                    "posted_within_hours", "sources", "contract_only"):
+            self.assertEqual(form["search"][key], before["search"][key])
+        self.assertIn("Python", open(os.path.join(
+            self.out, "profile_attested.md")).read())
+
+    def test_update_search_saves_sweep_only(self):
+        ok, info = self.ui.update_search({"search": {
+            "keywords": ["data engineer python"],
+            "match_skills": ["python", "sql"],
+            "location": "Remote US",
+            "job_types": ["full_time"], "workplace": ["remote"],
+            "posted_within_hours": 48, "sources": ["dice"]}})
         self.assertTrue(ok, info)
         form = json.load(open(self.form_path))
         self.assertEqual(form["search"]["keywords"], ["data engineer python"])
         self.assertEqual(form["search"]["posted_within_hours"], 48)
+        # Person carried over untouched.
+        self.assertEqual(form["name"], "Test Person")
         state = self.ui.state()
         self.assertEqual(state["spec"]["location"], "Remote US")
-        self.assertIn("Python", open(os.path.join(
-            self.out, "profile_attested.md")).read())
-        ok, err = self.ui.update_profile({
-            "name": "Test Person",
-            "attested_skills": [{"term": "Python", "evidence": "5 years"}],
-            "search": {"keywords": ["x"], "match_skills": ["python"]}})
+        ok, err = self.ui.update_search({"search": {
+            "keywords": ["x"], "match_skills": ["python"]}})
         self.assertFalse(ok)
         self.assertIn("2 match skills", err)
 
@@ -219,6 +234,11 @@ class TestServer(unittest.TestCase):
         self.assertIn('id="statApplied"', body)
         self.assertIn('id="saveProfile"', body)
         self.assertIn('id="pSkills"', body)
+        self.assertIn('data-nav="search"', body)
+        self.assertIn('id="saveSearch"', body)
+        self.assertIn('id="sKeywords"', body)
+        self.assertNotIn("Save my profile &amp; search", body)
+        self.assertNotIn('id="pKeywords"', body)
 
     def test_profile_first_in_sidebar_and_no_ride_button(self):
         # Owner's account model (2026-10-28): one login = one person, so
