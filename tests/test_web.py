@@ -166,6 +166,60 @@ class TestServer(unittest.TestCase):
         self.assertEqual(state["matches"][0]["audit"][0]["term"], "kafka")
         self.assertEqual(state["matches"][0]["pursuit_status"], "ready")
 
+    def test_state_range_filter_excludes_old_rows(self):
+        import sqlite3 as _sq
+        db = _sq.connect(os.path.join(self.out, "attested.db"))
+        db.execute(
+            "INSERT INTO candidate_matches (posting_id, candidate, verdict,"
+            " defensible, vulnerable, detail, created_at) VALUES"
+            " (1, 'Old Person', 'PASS', 3, 0, '{\"split\": {\"defensible\": [],"
+            " \"vulnerable\": []}}', '2020-01-01T00:00:00+00:00')")
+        db.commit()
+        db.close()
+        all_counts = self.ui.state("all")["counts"]
+        month_counts = self.ui.state("month")["counts"]
+        today_counts = self.ui.state("today")["counts"]
+        self.assertEqual(all_counts["judged"], month_counts["judged"] + 1)
+        self.assertEqual(all_counts["pass"], month_counts["pass"] + 1)
+        self.assertLessEqual(today_counts["judged"], month_counts["judged"])
+        state = self.ui.state("nonsense")
+        self.assertEqual(state["range"], "all")
+
+    def test_update_profile_saves_form_and_spec(self):
+        ok, info = self.ui.update_profile({
+            "name": "Test Person",
+            "attested_skills": [{"term": "Python", "evidence": "5 years"},
+                                {"term": "SQL", "evidence": "5 years"}],
+            "hard_boundaries": ["No Kafka"],
+            "search": {"keywords": ["data engineer python"],
+                       "match_skills": ["python", "sql"],
+                       "location": "Remote US",
+                       "job_types": ["full_time"], "workplace": ["remote"],
+                       "posted_within_hours": 48, "sources": ["dice"]}})
+        self.assertTrue(ok, info)
+        form = json.load(open(self.form_path))
+        self.assertEqual(form["search"]["keywords"], ["data engineer python"])
+        self.assertEqual(form["search"]["posted_within_hours"], 48)
+        state = self.ui.state()
+        self.assertEqual(state["spec"]["location"], "Remote US")
+        self.assertIn("Python", open(os.path.join(
+            self.out, "profile_attested.md")).read())
+        ok, err = self.ui.update_profile({
+            "name": "Test Person",
+            "attested_skills": [{"term": "Python", "evidence": "5 years"}],
+            "search": {"keywords": ["x"], "match_skills": ["python"]}})
+        self.assertFalse(ok)
+        self.assertIn("2 match skills", err)
+
+    def test_page_has_range_filter_and_profile_editor(self):
+        status, body = self._get("/")
+        self.assertEqual(status, 200)
+        self.assertIn('data-range="today"', body)
+        self.assertIn('data-range="all"', body)
+        self.assertIn('id="statApplied"', body)
+        self.assertIn('id="saveProfile"', body)
+        self.assertIn('id="pSkills"', body)
+
     def test_page_and_doc(self):
         status, body = self._get("/")
         self.assertEqual(status, 200)

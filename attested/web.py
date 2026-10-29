@@ -26,11 +26,46 @@ import re
 import sqlite3
 import threading
 import time
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import parse_qs, urlparse
+from zoneinfo import ZoneInfo
 
 from . import meta_client, profile, verifier
+
+ET = ZoneInfo("America/New_York")
+RANGE_KEYS = ("today", "yesterday", "month", "all")
+RANGE_LABELS = {"today": "Today", "yesterday": "Yesterday",
+                "month": "This month", "all": "All time"}
+
+
+def range_window(key, now=None):
+    """(start, end) UTC ISO bounds for a stats range, on ET calendar days.
+
+    'today' starts at midnight ET *by construction* — the daily reset the
+    owner asked for needs no cron and deletes nothing: at 12:00am ET the
+    window simply rolls to the new day, and older days stay reachable
+    through the Yesterday / This month / All time filters. Bounds are
+    [start, end) so a row lands in exactly one day.
+    """
+    if key not in RANGE_KEYS:
+        key = "all"
+    if key == "all":
+        return None, None
+    now = now or datetime.now(ET)
+    today = now.date()
+    if key == "yesterday":
+        start_d, end_d = today - timedelta(days=1), today
+    elif key == "month":
+        start_d, end_d = today.replace(day=1), today + timedelta(days=1)
+    else:  # today
+        start_d, end_d = today, today + timedelta(days=1)
+
+    def bound(d):
+        return datetime(d.year, d.month, d.day, tzinfo=ET).astimezone(
+            timezone.utc).isoformat(timespec="seconds")
+
+    return bound(start_d), bound(end_d)
 
 ACTOR_COLORS = {
     "system": "#9caab8", "shopper": "#60a5fa", "sweeper": "#2dd4bf",
@@ -512,16 +547,15 @@ class UI:
         threading.Thread(target=go, daemon=True).start()
         return True
 
-    # -- the ride: a visitor's own form -> their own store -> full flow --
-    def start_ride(self, payload):
-        """Validate a submitted onboarding form, write it as a ride, switch
-        the UI to the ride's own store, and run the complete flow on it.
-        Returns (True, slug) or (False, error-for-the-form)."""
-        if self.readonly():
-            return False, "This shared preview is view-only — rides run on the live machine."
+    @staticmethod
+    def _form_from_payload(payload):
+        """Validate an onboarding/profile payload into a form dict.
+        Returns (form, None) or (None, error-for-the-form). Shared by the
+        ride (a new person's form) and the profile editor (the same person
+        updating their profile + sweep), so both obey identical rules."""
         name = str(payload.get("name") or "").strip()
         if not name:
-            return False, "Please add your name."
+            return None, "Please add your name."
         skills = []
         for row in payload.get("attested_skills") or []:
             term = str(row.get("term") or "").strip()
@@ -529,16 +563,16 @@ class UI:
                 skills.append({"term": term,
                                "evidence": str(row.get("evidence") or "").strip()})
         if not skills:
-            return False, "Add at least one skill you can honestly claim."
+            return None, "Add at least one skill you can honestly claim."
         search = payload.get("search") or {}
         keywords = [str(k).strip() for k in search.get("keywords") or []
                     if str(k).strip()]
         match_skills = [str(k).strip().lower() for k in
                         search.get("match_skills") or [] if str(k).strip()]
         if not keywords:
-            return False, "Add at least one search phrase (e.g. 'data engineer python')."
+            return None, "Add at least one search phrase (e.g. 'data engineer python')."
         if len(match_skills) < 2:
-            return False, "Pick at least 2 match skills — a role stays in only if it asks for 2+ of them."
+            return None, "Pick at least 2 match skills — a role stays in only if it asks for 2+ of them."
         sources = [s for s in (search.get("sources") or []) if s in KNOWN_SOURCES]
         if not sources:
             sources = list(KNOWN_SOURCES)
@@ -562,6 +596,49 @@ class UI:
                 "sources": sources,
             },
         }
+        return form, None
+
+    def update_profile(self, payload):
+        """The Your-profile tab's Save: rewrite the CURRENT form in place
+        (attested skills, hard boundaries, and the whole sweep spec), and
+        re-render the attested profile beside the store, so the very next
+        Scan for New Roles shops with the new settings. Nothing already
+        found, built, or applied is touched. Preserves form keys the
+        editor does not manage (note, raw_resume_file)."""
+        if self.readonly():
+            return False, "View-only preview — profile editing is disabled."
+        form, err = self._form_from_payload(payload)
+        if form is None:
+            return False, err
+        try:
+            current = profile.load_form(self.form_path)
+        except Exception:
+            current = {}
+        for key, value in current.items():
+            form.setdefault(key, value)
+        with open(self.form_path, "w") as f:
+            json.dump(form, f, indent=1)
+        with open(os.path.join(self.out_dir, "profile_attested.md"), "w") as f:
+            f.write(profile.render_profile_md(form))
+        self._append_event(
+            "system",
+            f"Profile updated from the website — {form['name']}: "
+            f"{len(form['attested_skills'])} attested skills, search is now "
+            f"{' / '.join(form['search']['keywords'])} "
+            f"({form['search']['location']}). The next scan uses these.")
+        return True, "saved"
+
+    # -- the ride: a visitor's own form -> their own store -> full flow --
+    def start_ride(self, payload):
+        """Validate a submitted onboarding form, write it as a ride, switch
+        the UI to the ride's own store, and run the complete flow on it.
+        Returns (True, slug) or (False, error-for-the-form)."""
+        if self.readonly():
+            return False, "This shared preview is view-only — rides run on the live machine."
+        form, err = self._form_from_payload(payload)
+        if form is None:
+            return False, err
+        name = form["name"]
         raw_text = str(payload.get("raw_resume") or "").strip()
         upload = payload.get("resume_upload") or {}
         if upload.get("data_b64"):
@@ -632,33 +709,59 @@ class UI:
         return True
 
     # -- state -----------------------------------------------------
-    def state(self):
+    def state(self, range_key="all"):
+        if range_key not in RANGE_KEYS:
+            range_key = "all"
+        win_start, win_end = range_window(range_key)
         form = profile.load_form(self.form_path)
         profile_text = profile.render_profile_md(form)
         attested = verifier.parse_profile(profile_text)
         db_path = os.path.join(self.out_dir, "attested.db")
         counts = {"raw": 0, "postings": 0, "judged": 0, "pass": 0,
-                  "resumes": 0, "pursuits": 0}
+                  "resumes": 0, "pursuits": 0, "applied": 0}
         matches = []
         if os.path.exists(db_path):
             db = sqlite3.connect(f"file:{db_path}?mode=ro", uri=True)
             db.row_factory = sqlite3.Row
-            for key, table in (("raw", "job_posting_raw"),
-                               ("postings", "job_postings"),
-                               ("judged", "candidate_matches"),
-                               ("resumes", "candidate_resumes"),
-                               ("pursuits", "pursuits")):
-                counts[key] = db.execute(
-                    f"SELECT COUNT(*) c FROM {table}").fetchone()["c"]
-            counts["pass"] = db.execute(
-                "SELECT COUNT(*) c FROM candidate_matches WHERE verdict='PASS'"
+
+            def win(col):
+                """(sql fragment, params) limiting col to the range window."""
+                if win_start is None:
+                    return "", []
+                return (f" AND {col} >= ? AND {col} < ?",
+                        [win_start, win_end])
+
+            w, p = win("fetched_at")
+            counts["raw"] = db.execute(
+                "SELECT COUNT(*) c FROM job_posting_raw WHERE 1=1" + w, p
             ).fetchone()["c"]
+            w, p = win("m.created_at")
+            counts["judged"] = db.execute(
+                "SELECT COUNT(*) c FROM candidate_matches m WHERE 1=1" + w, p
+            ).fetchone()["c"]
+            counts["pass"] = db.execute(
+                "SELECT COUNT(*) c FROM candidate_matches m "
+                "WHERE m.verdict='PASS'" + w, p).fetchone()["c"]
+            w, p = win("created_at")
+            counts["resumes"] = db.execute(
+                "SELECT COUNT(*) c FROM candidate_resumes WHERE 1=1" + w, p
+            ).fetchone()["c"]
+            counts["pursuits"] = db.execute(
+                "SELECT COUNT(*) c FROM pursuits WHERE 1=1" + w, p
+            ).fetchone()["c"]
+            w, p = win("updated_at")
+            counts["applied"] = db.execute(
+                "SELECT COUNT(*) c FROM pursuits "
+                "WHERE status='applied'" + w, p).fetchone()["c"]
             # Postings chip = postings with a real title. The LinkedIn guest
             # source yields ID-only stubs (no title/JD) — they sit in the
             # table as thin rows and are excluded from the funnel number.
+            # A posting counts in the window its raw row was fetched.
+            w, p = win("r.fetched_at")
             counts["postings"] = db.execute(
-                "SELECT COUNT(*) c FROM job_postings WHERE title != ''"
-            ).fetchone()["c"]
+                "SELECT COUNT(*) c FROM job_postings p "
+                "JOIN job_posting_raw r ON r.id = p.raw_id "
+                "WHERE p.title != ''" + w, p).fetchone()["c"]
             rows = db.execute(
                 "SELECT m.posting_id, m.verdict, m.defensible, m.vulnerable,"
                 " m.detail, p.title, p.company, p.source, p.apply_url,"
@@ -732,7 +835,9 @@ class UI:
                 "job_types": form["search"].get("job_types", []),
                 "workplace": form["search"].get("workplace", []),
             },
-            "counts": counts, "matches": matches, "events": merged,
+            "counts": counts, "range": range_key,
+            "range_label": RANGE_LABELS[range_key],
+            "matches": matches, "events": merged,
             "feed": human_feed(merged),
             "intake": intake,
             "running": dict(self._running), "can_run": self.can_run(),
@@ -930,6 +1035,7 @@ a{color:var(--teal)}
 .pulse{display:inline-block;width:9px;height:9px;border-radius:50%;background:var(--green);animation:pl 1.1s infinite}
 @keyframes pl{0%,100%{opacity:1}50%{opacity:.25}}
 .btnStop{background:#E2445C;color:#fff;border:none;border-radius:9999px;padding:9px 16px;font-weight:700;cursor:pointer}
+.rangebar{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:2px 0 12px}
 details.rawlog{margin-top:4px}details.rawlog summary{cursor:pointer;color:var(--faint);font-size:12.5px}
 .ev{display:flex;gap:10px;padding:7px 4px;border-bottom:1px solid #EDF3EF}
 .ev .ava2{flex:0 0 30px;width:30px;height:30px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:15px;background:#E7EFEA}
@@ -965,12 +1071,21 @@ details.rawlog{margin-top:4px}details.rawlog summary{cursor:pointer;color:var(--
   </div>
  </div>
  <div id="viewMain">
+ <div class="rangebar">
+  <span style="font-weight:700;color:var(--ink)">Show numbers for:</span>
+  <button class="tab rangebtn on" data-range="today" type="button">Today</button>
+  <button class="tab rangebtn" data-range="yesterday" type="button">Yesterday</button>
+  <button class="tab rangebtn" data-range="month" type="button">This month</button>
+  <button class="tab rangebtn" data-range="all" type="button">All time</button>
+  <span class="hint" id="rangeNote"></span>
+ </div>
  <div class="stats">
   <div class="stat"><div class="lb">🔎 Jobs scanned</div><div class="num" id="statRaw">0</div><div class="sb" id="statRawSub"></div></div>
   <div class="stat"><div class="lb">⚖️ Roles audited</div><div class="num" id="statJudged">0</div><div class="sb">read in full, against your proof</div></div>
   <div class="stat hero"><div class="lb">✅ Worth your time</div><div class="num" id="statPass">0</div><div class="sb">passed the honesty audit</div></div>
   <div class="stat"><div class="lb">✍️ Resumes built</div><div class="num" id="statResumes">0</div><div class="sb">tailored — every claim provable</div></div>
   <div class="stat"><div class="lb">📮 Applications prepared</div><div class="num" id="statPursuits">0</div><div class="sb">waiting for your click — nothing auto-sent</div></div>
+  <div class="stat"><div class="lb">🎉 Applied</div><div class="num" id="statApplied">0</div><div class="sb">submitted — the confirmation is saved on the board</div></div>
  </div>
 
  <section class="card" id="rideView">
@@ -1028,6 +1143,23 @@ details.rawlog{margin-top:4px}details.rawlog summary{cursor:pointer;color:var(--
    <div class="cardhead" style="font-size:17px">Your Attested Profile</div>
    <div style="margin-top:12px" id="skills"></div><div class="never" id="never"></div>
    <div class="spec" id="spec"></div>
+   <div style="border-top:1px solid #EEF4F0;margin-top:16px;padding-top:14px">
+    <div class="cardhead" style="font-size:15px">✏️ Update your profile &amp; your search</div>
+    <p class="shieldnote">Change anything here and hit Save — your attested profile and your search (the sweep) update together, and the next <b>Scan for New Roles</b> uses the new settings. Jobs already found, resumes already built, and applications already sent are not changed.</p>
+    <div class="fgrid">
+     <div class="fld"><label>Your name</label><input type="text" id="pName"></div>
+     <div class="fld"><label>Where should it look? <span class="hint">location</span></label><input type="text" id="pLoc"></div>
+     <div class="fld" style="grid-column:1/-1"><label>Your skills — claim only what you can defend <span class="hint">skill + your proof</span></label><div id="pSkills"></div><button class="btn2" id="addPSkill" type="button">＋ Add a skill</button></div>
+     <div class="fld" style="grid-column:1/-1"><label>Hard boundaries <span class="hint">one per line — things you have NOT done and will not claim</span></label><textarea id="pBounds" rows="3"></textarea></div>
+     <div class="fld"><label>Search phrases <span class="hint">comma-separated</span></label><input type="text" id="pKeywords"></div>
+     <div class="fld"><label>Match skills <span class="hint">comma-separated — a role stays in only if it asks for ≥2 of these</span></label><input type="text" id="pMatch"></div>
+     <div class="fld"><label>Look on</label><div class="srcs" id="pSources"></div></div>
+     <div class="fld"><label>Job type</label><div class="srcs"><label style="font-weight:400"><input type="checkbox" class="pjt" value="contract"> Contract</label><label style="font-weight:400"><input type="checkbox" class="pjt" value="full_time"> Full-time</label><label style="font-weight:400"><input type="checkbox" class="pjt" value="part_time"> Part-time</label></div><span class="hint">none ticked = any type</span></div>
+     <div class="fld"><label>Workplace</label><div class="srcs"><label style="font-weight:400"><input type="checkbox" class="pwp" value="remote"> Remote</label><label style="font-weight:400"><input type="checkbox" class="pwp" value="hybrid"> Hybrid</label><label style="font-weight:400"><input type="checkbox" class="pwp" value="onsite"> On-site</label></div><span class="hint">none ticked = anywhere · posted in the last</span> <select id="pHours"><option value="12">12h</option><option value="24">24h</option><option value="48">48h</option><option value="72">3 days</option><option value="168">7 days</option></select></div>
+    </div>
+    <div style="margin-top:14px;display:flex;gap:8px;align-items:center"><button class="btn1" id="saveProfile" type="button">💾 Save my profile &amp; search</button><span class="hint" id="profileSaved"></span></div>
+    <div class="err" id="profileErr"></div>
+   </div>
   </section>
  </div>
 
@@ -1066,7 +1198,8 @@ const TRIM=m=>{const i=m.indexOf('matches/');return i>0&&m.length>110?('…/'+m.
 const PASTELS=['#FDE8D7','#DCEBFF','#E7E0FF','#D9F2E4','#FFF3C4','#FFE0E6','#D8F3F0'];
 const avaFor=name=>{const w=String(name||'?').split(/\s+/).filter(Boolean);const ini=((w[0]||'?')[0]+(w[1]?(w[1][0]):'')).toUpperCase();let h=0;for(const ch of String(name||''))h=(h*31+ch.charCodeAt(0))>>>0;return{ini,bg:PASTELS[h%PASTELS.length]};};
 let _lastSig='';
-async function load(){try{const r=await fetch('api/state');const nxt=await r.json();const sig=JSON.stringify(nxt);if(sig===_lastSig)return;_lastSig=sig;S=nxt;render();}catch(e){}}
+let range='today';
+async function load(){try{const r=await fetch('api/state?range='+range);const nxt=await r.json();const sig=JSON.stringify(nxt);if(sig===_lastSig)return;_lastSig=sig;S=nxt;render();}catch(e){}}
 function render(){
  const first=(S.candidate||'').split(' ')[0]||'there';
  document.getElementById('cand').textContent=S.candidate;
@@ -1083,6 +1216,9 @@ function render(){
  document.getElementById('statPass').textContent=c.pass;
  document.getElementById('statResumes').textContent=c.resumes;
  document.getElementById('statPursuits').textContent=c.pursuits;
+ document.getElementById('statApplied').textContent=c.applied||0;
+ document.getElementById('rangeNote').textContent=(S.range_label||'All time')+(S.range==='today'?' — fresh every morning, resets at midnight ET':'')+' · the board below always shows everything still waiting for you, from every day';
+ populateProfile();
  document.getElementById('skills').innerHTML=S.skills.map(s=>'<p class="skill"><b>'+esc(s.term)+'</b> — '+esc(s.evidence)+'</p>').join('');
  document.getElementById('never').innerHTML='<b>Your hard boundaries:</b> '+S.boundaries.map(esc).join(' · ');
  const sp=S.spec;
@@ -1216,6 +1352,47 @@ document.getElementById('startRide').onclick=submitRide;
 document.getElementById('fResumeFile').onchange=e=>{const f=e.target.files&&e.target.files[0];document.getElementById('fResumeFileName').textContent=f?('Selected: '+f.name+' — the Safety Check will read this file'):'';};
 document.getElementById('homeBtn').onclick=async()=>{await fetch('api/home',{method:'POST'});cur=null;load();};
 document.getElementById('buildMissing').onclick=async()=>{await fetch('api/build_missing',{method:'POST'});load();};
+// ---- stats range filter: Today | Yesterday | This month | All time ----
+document.querySelectorAll('.rangebtn').forEach(b=>b.onclick=()=>{range=b.dataset.range;document.querySelectorAll('.rangebtn').forEach(x=>x.classList.toggle('on',x===b));_lastSig='';load();});
+// ---- profile editor (Your profile tab): profile + sweep, saved together ----
+let profSig='',profDirty=false;
+function populateProfile(){
+ if(!S)return;
+ const sig=JSON.stringify([S.candidate,S.skills,S.boundaries,S.spec]);
+ if(sig===profSig||profDirty)return;
+ profSig=sig;
+ const sp=S.spec||{};
+ document.getElementById('pName').value=S.candidate||'';
+ document.getElementById('pLoc').value=sp.location||'';
+ const sk=document.getElementById('pSkills');sk.innerHTML='';(S.skills||[]).forEach(s=>sk.appendChild(skillRow(s.term,s.evidence)));
+ document.getElementById('pBounds').value=(S.boundaries||[]).join('\n');
+ document.getElementById('pKeywords').value=(sp.keywords||[]).join(', ');
+ document.getElementById('pMatch').value=(sp.match_skills||[]).join(', ');
+ const jts=sp.job_types||(sp.contract_only?['contract']:[]);
+ document.querySelectorAll('.pjt').forEach(c=>c.checked=jts.includes(c.value));
+ const wps=sp.workplace||[];
+ document.querySelectorAll('.pwp').forEach(c=>c.checked=wps.includes(c.value));
+ document.getElementById('pHours').value=String(sp.posted_within_hours||24);
+ const srcs=sp.sources||[];
+ document.getElementById('pSources').innerHTML=['dice','remoteok','arbeitnow','linkedin_guest'].map(s=>'<label style="font-weight:400"><input type="checkbox" class="psrc" value="'+s+'"'+(srcs.includes(s)?' checked':'')+'> '+s+'</label>').join('');
+}
+document.getElementById('profileSec').addEventListener('input',()=>{profDirty=true;});
+document.getElementById('pSkills').addEventListener('click',()=>{profDirty=true;});
+document.getElementById('addPSkill').onclick=()=>{profDirty=true;document.getElementById('pSkills').appendChild(skillRow('',''));};
+document.getElementById('saveProfile').onclick=async()=>{
+ const err=document.getElementById('profileErr');err.style.display='none';
+ const saved=document.getElementById('profileSaved');saved.textContent='';
+ const skills=[...document.querySelectorAll('#pSkills .skillrow')].map(r=>({term:r.querySelector('.st').value,evidence:r.querySelector('.se').value})).filter(s=>s.term.trim());
+ const payload={name:document.getElementById('pName').value,attested_skills:skills,
+  hard_boundaries:document.getElementById('pBounds').value.split('\n'),
+  search:{keywords:document.getElementById('pKeywords').value.split(','),match_skills:document.getElementById('pMatch').value.split(','),location:document.getElementById('pLoc').value,job_types:[...document.querySelectorAll('.pjt:checked')].map(c=>c.value),workplace:[...document.querySelectorAll('.pwp:checked')].map(c=>c.value),posted_within_hours:parseInt(document.getElementById('pHours').value),sources:[...document.querySelectorAll('.psrc:checked')].map(c=>c.value)}};
+ const btn=document.getElementById('saveProfile');btn.disabled=true;btn.textContent='Saving…';
+ try{const r=await fetch('api/profile',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});const j=await r.json();
+  if(j.saved){profDirty=false;profSig='';saved.textContent='Saved ✓ — the next Scan for New Roles uses these settings.';_lastSig='';load();}
+  else{err.textContent=j.error||'Could not save.';err.style.display='block';}
+ }catch(e){err.textContent='Could not reach the server.';err.style.display='block';}
+ btn.disabled=false;btn.textContent='💾 Save my profile & search';
+};
 // ---- apply from the website ----
 function applyHtml(){
  if(!cur||!cur.pursuit_id)return '';
@@ -1264,7 +1441,8 @@ def make_handler(ui):
                 self.end_headers()
                 self.wfile.write(body)
             elif parsed.path == "/api/state":
-                self._json(ui.state())
+                qs = parse_qs(parsed.query)
+                self._json(ui.state(qs.get("range", ["all"])[0]))
             elif parsed.path == "/api/download":
                 qs = parse_qs(parsed.query)
                 try:
@@ -1326,6 +1504,17 @@ def make_handler(ui):
                     payload = {}
                 self._json({"stopping": ui.request_stop(
                     payload.get("mode", "keep"))})
+            elif self.path == "/api/profile":
+                try:
+                    length = int(self.headers.get("Content-Length") or 0)
+                    payload = json.loads(self.rfile.read(length) or b"{}")
+                except (ValueError, json.JSONDecodeError):
+                    self._json({"saved": False, "error": "Bad form data."}, 400)
+                    return
+                ok, info = ui.update_profile(payload)
+                self._json({"saved": ok} if ok
+                           else {"saved": False, "error": info},
+                           200 if ok else 400)
             elif self.path == "/api/ride":
                 try:
                     length = int(self.headers.get("Content-Length") or 0)
