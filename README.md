@@ -196,4 +196,4 @@ CMM (this build) was built during the Meta Global AI Developer Hackathon
 
 ## Licence
 
-MIT
+© 2026 Sharyaz Hafeez Mohammed — all rights reserved. Public for Meta hackathon judging only; see `LICENSE`. No reuse, copying, or commercial use without written permission.

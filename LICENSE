@@ -1,21 +1,21 @@
-MIT License
+Copyright (c) 2026 Sharyaz Hafeez Mohammed. All rights reserved.
 
-Copyright (c) 2026 Sharyaz Hafeez Mohammed
+This repository is public for one purpose only: so the judges and
+organisers of the Meta Global AI Developer Hackathon (2026) can view,
+download, and run this code to evaluate the CMM submission.
 
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
+No other rights are granted. Except for that hackathon evaluation, you
+may not — without prior written permission from the copyright holder —
+copy, modify, merge, publish, distribute, sublicense, sell, or otherwise
+use this software, its design, or any derivative work, in whole or in
+part, for any commercial or non-commercial purpose.
 
-The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software.
+CMM — Candidate Marketing Machine, its name, framing, and workflow are
+the intellectual property of the copyright holder. Viewing or cloning
+this repository does not grant any licence to them.
 
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-SOFTWARE.
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS
+OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+IN NO EVENT SHALL THE COPYRIGHT HOLDER BE LIABLE FOR ANY CLAIM, DAMAGES
+OR OTHER LIABILITY ARISING FROM THE USE OF THE SOFTWARE.
