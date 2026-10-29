@@ -30,12 +30,27 @@ immutable handoff chain, exactly like production.
    boundaries ("never used Snowpark"), and says what to shop for: keyword
    phrases, match skills, location, contract-only, recency window. The form
    *is* the candidate record; the shopper step turns it into a sweep config.
-2. **Sweeper fleet** — config-driven collectors over public job sources
-   (Dice primary — the scriptable backbone, exactly as in production;
-   RemoteOK and Arbeitnow public APIs; a LinkedIn guest source that is
-   attempt-and-degrade by design). One blocked source never stops the fleet:
-   the doctor line reports it and the sweep continues. Raw postings land
-   untouched in `job_posting_raw`, deduped on (source, external id).
+2. **Sweeper fleet** — config-driven collectors, two sources, each reached
+   the way that source actually allows:
+   - **Dice — plain code, in the product.** The sweeper reads Dice's search
+     and detail pages directly with the config's filters. No login, no AI.
+   - **LinkedIn — a browser agent, signed in as the seeker.** LinkedIn's
+     real search (contract filter, last-24-hours, full job descriptions)
+     exists only inside a member's signed-in session; its guest endpoint
+     returns ID-only stubs and cannot filter for contract work, so it was
+     retired. Instead, a **scout** — a browser agent working in the
+     seeker's own signed-in LinkedIn session, read-only, capped, with an
+     identity guard and a hard stop at any security checkpoint — runs the
+     config's filters and deposits full job records into the store's
+     `linkedin_inbox/`. The sweeper ingests those deposits like any other
+     source (keyword- and recency-checked, deduped). No credentials ever
+     enter the code or the store; the session lives only in the browser.
+     See *The agent layer* below.
+   (RemoteOK and Arbeitnow were removed 2026-10-28 — thin, mostly
+   non-contract feeds. Their parsers remain so stored rows still parse.)
+   One blocked source never stops the fleet: the doctor line reports it
+   and the sweep continues. Raw postings land untouched in
+   `job_posting_raw`, deduped on (source, external id).
 3. **Parser** — raw payloads become normalized postings with full JD text.
    Second dedupe layer: company + title.
 4. **Keep rule** (production rule) — a posting survives only if at least 2 of
@@ -75,9 +90,14 @@ immutable handoff chain, exactly like production.
    confirmation text recorded as evidence (`run_apply.py`). The submission
    click is the human's: this build never enters credentials and never
    submits as the seeker — the demo persona is fictional, and applying as
-   a fictional person to real employers would be fraud. In production,
-   this same stage hands off to signed-in per-route appliers on the
-   seeker's own accounts.
+   a fictional person to real employers would be fraud. In the live
+   deployment the loop closes through the agent layer: the web UI records
+   an **apply request** on the seeker's click, and a browser-agent
+   executor working in the seeker's own signed-in Dice session performs
+   the submission and brings back the employer's confirmation verbatim
+   (routes that apply on a company's own site are reported honestly as
+   package-only). In production, this same stage hands off to signed-in
+   per-route appliers on the seeker's own accounts.
 10. **Evidence Dossier + Call Queue** — per match: **Defensible claims**
    (verified, each with its evidence) and **Vulnerable claims** (job
    requirements with no attested proof — claiming them is an interview
@@ -91,6 +111,41 @@ A single-JD mode (`run_demo.py`) also exists for the reproducible fixture
 case, and the **Intake Audit** runs in both modes: the seeker's own outgoing
 resume is checked by the same deterministic guardrail before any agent runs —
 the demo's climax is the machine catching the *human's* exaggerations.
+
+## The agent layer — who does what, and where
+
+CMM is deliberately split by *what kind of worker a job needs*. Nothing
+here is "the AI does everything":
+
+| Stage | Powered by | Where it runs |
+|---|---|---|
+| Sweeper — Dice | Plain code | Inside the product |
+| Sweeper — LinkedIn (**the Scout**) | **Browser agent** in the seeker's own signed-in session | The seeker's browser session; deposits land in the product's `linkedin_inbox/` |
+| Parser · Keep rule · **Verifier** | Plain code — never an LLM | Inside the product |
+| Reader · Builder | **Muse Spark 1.3** (Meta Model API) | Called by the product |
+| Applier — packages & outcome tracking | Plain code | Inside the product |
+| Applier — the submission itself | **Browser agent** on the seeker's own signed-in session, on the seeker's click | The seeker's browser session |
+| The final decision | **The human** | — |
+
+Why browser agents at all? Because two moments in a job search can only
+happen *as the member*: LinkedIn's contract-filtered, hours-fresh search
+exists only inside a signed-in session, and a Dice application can only
+be submitted by the signed-in seeker. An API key cannot be a member. So
+the parts that need an identity are done by a browser agent sitting in
+the seeker's own session — read-only while scouting, acting only on an
+explicit Apply click while applying, identity-checked before it moves,
+and stopped cold by any security checkpoint.
+
+In this repository, the agent layer is represented by its two contracts:
+the scout **deposit format** (`linkedin_inbox/*.json`, ingested by
+`attested/sweeper.py`) and the **apply-request flag** the UI sets for the
+executor. In the live demo those seats are worked by the team's browser
+agents so the behaviour can be watched end to end. In the product, the
+Scout ships as a small add-on in the seeker's own browser — the session
+never leaves the seeker's machine, and no LinkedIn password is ever
+shared with or stored by CMM. (For the done-for-you service model, the
+same scout runs in a per-candidate isolated browser profile; profiles
+never mix.)
 
 ## Why it is built this way
 
@@ -138,18 +193,15 @@ export META_MODEL_API_KEY=<your key>   # only needed for the Run buttons
 python3 run_web.py 8765                # http://127.0.0.1:8765
 ```
 
-- **The Ride (front door)** — "Try it with your own profile" opens the
-  onboarding form *inside* the UI: name, skills with evidence, hard
-  boundaries, an optional paste of your current resume (the Safety Check
-  audits it), search phrases, match skills, sources, job type
-  (contract / full-time / part-time) and workplace (remote / hybrid /
-  on-site) — the flow enforces the type filters where a posting states
-  its type, and keeps postings whose type is unstated. **Start my search**
-  writes the form, creates the visitor's own store, and runs the complete
-  flow on it — the whole machine, live in the Activity feed, ending in
-  their own dossiers, resumes and prepared applications. "Back to demo
-  results" returns to the preloaded store. This is the product journey,
-  not a demo trick: form in, machine works, human decides.
+- **One login = one person** — an account belongs to exactly one seeker,
+  so there is no "try another profile" switch inside a login. The
+  onboarding form (name, skills with evidence, hard boundaries, an
+  optional resume upload the Safety Check audits, search phrases, match
+  skills, sources, job type and workplace) creates the account's own
+  store; afterwards the seeker edits the two halves independently from
+  the sidebar: **Your profile** (the person — *Save my profile*) and
+  **Your search** (the sweep — *Save my search*). Neither save can
+  clobber the other.
 - **Built resumes are deliverables**: every tailored resume downloads as
   an editable **Word (.docx)** or **PDF** (generated stdlib-only —
   `attested/export.py`), from the resume tab of its dossier.
@@ -159,11 +211,21 @@ python3 run_web.py 8765                # http://127.0.0.1:8765
   or *discard everything this run produced* (a ride's store is removed;
   a scan's new rows are rolled back by run snapshot). Runs halt
   cooperatively between steps — never mid-write.
-- **Header** — funnel chips from the real store (swept → parsed → judged →
-  PASS → resumes → pursuits).
-- **Attested Identity** rail — the seeker's attested skills with evidence,
-  hard boundaries, the compact sweep spec, and the permanent **Intake
-  Audit** panel (the rejected claims from his own resume, in red).
+- **Stat cards with a period filter** — jobs scanned, roles audited,
+  passed, resumes built, applications prepared, and **applied**, counted
+  by ET calendar day with a Today / Yesterday / This month / All time
+  filter (today resets at midnight ET by construction; the board itself
+  is never filtered, so waiting work never disappears overnight).
+- **Your pipeline board** — four columns that mirror the outcome loop:
+  Found (full job cards, expandable postings) → Resume Builder (one row
+  per role: the job on the left, its tailored resume on the right — or
+  the plain-words reason no resume was built) → Ready to Apply (the
+  Apply button) → Outcome (applied with the employer's verbatim
+  confirmation, in-flight, or not-applied with the honest reason).
+- **🧠 How CMM works** — a page inside the product that explains the
+  machine to the seeker (and to judges): every worker, what powers it
+  (plain code / Muse Spark / browser agent / the human), and a live
+  count from the account's own pipeline on each step.
 - **Live event stream** — every agent and guardrail event, actor-colored,
   with Muse Spark's reasoning progress visible while it thinks. Two live
   actions: evaluate the demo JD end-to-end in real time, or resume the

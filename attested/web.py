@@ -225,10 +225,25 @@ def human_feed(events):
         mm = re.match(r"(\w+): (\d+) fetched, (\d+) new raw postings", m)
         if mm:
             src = SOURCE_NAMES.get(mm.group(1), mm.group(1))
-            add("🔎", "", f"Found {mm.group(2)} jobs on {src}",
-                (f"{mm.group(3)} of them are new — the rest were already "
-                 "in the pile from earlier scans." if mm.group(3) != mm.group(2)
-                 else "All of them are new."), ts)
+            if mm.group(1) == "linkedin":
+                # The signed-in source gets its own story step: judges
+                # and seekers alike must SEE that a browser agent in the
+                # seeker's own session did this — it is the advanced
+                # part, not a public feed.
+                add("🕵️", "", f"Your browser scout brought "
+                    f"{mm.group(2)} jobs from LinkedIn",
+                    "A browser agent working inside YOUR signed-in "
+                    "LinkedIn session ran your filters (contract · last "
+                    "24 hours) and read each job in full — that is why "
+                    "these are fresher and richer than anything a public "
+                    "listing or a guest visit can see. "
+                    f"({mm.group(3)} of them are new.)", ts)
+            else:
+                add("🔎", "", f"Found {mm.group(2)} jobs on {src}",
+                    (f"{mm.group(3)} of them are new — the rest were "
+                     "already in the pile from earlier scans."
+                     if mm.group(3) != mm.group(2)
+                     else "All of them are new."), ts)
             continue
         mm = re.search(r"source (\w+) unavailable", m)
         if mm:
@@ -1096,6 +1111,7 @@ details.rawlog{margin-top:4px}details.rawlog summary{cursor:pointer;color:var(--
   <a href="#" data-nav="search"><span class="ni">🔎</span>Your search</a>
   <a href="#" data-nav="main" class="on"><span class="ni">⌂</span>Today</a>
   <a href="#" data-nav="main" data-scroll="boardSec"><span class="ni">▦</span>Your pipeline</a>
+  <a href="#" data-nav="how"><span class="ni">🧠</span>How CMM works</a>
   <a href="#" data-nav="targets"><span class="ni">🎯</span>Live Market Targets</a>
   <a href="#" data-nav="safety"><span class="ni">🛡️</span>Safety check</a>
  </nav>
@@ -1216,6 +1232,23 @@ details.rawlog{margin-top:4px}details.rawlog summary{cursor:pointer;color:var(--
   </section>
  </div>
 
+ <div id="viewHow" style="display:none">
+  <section class="card">
+   <div class="cardhead" style="font-size:17px">🧠 How CMM works — the whole machine, in the open</div>
+   <p class="shieldnote" style="font-size:14px"><b>Code fetches and judges. Muse Spark reads and writes. Browser agents walk in your signed-in sessions. You decide.</b> Every worker below is real, and the number on each step is counted live from this account's own pipeline.</p>
+   <div style="display:flex;flex-direction:column;gap:10px;margin-top:14px">
+    <div style="display:flex;gap:12px;align-items:flex-start;background:#F7FBF8;border:1px solid #E3EFE6;border-radius:12px;padding:12px 14px"><div style="font-size:22px">🔎</div><div style="flex:1"><b>The Shopper</b> <span style="background:#E8F5E9;color:#1B7A43;border-radius:20px;padding:1px 9px;font-size:11px;font-weight:700">PLAIN CODE — NO AI</span><div style="color:#46645A;font-size:13.5px;margin-top:3px">Takes your search settings and reads Dice directly — search results and every job's full description. No login needed; Dice shows its listings to anyone.</div></div><div style="text-align:right"><div style="font-size:20px;font-weight:800" id="hwRaw">–</div><div style="font-size:11px;color:#7A9186">jobs collected</div></div></div>
+    <div style="display:flex;gap:12px;align-items:flex-start;background:#F7FBF8;border:1px solid #E3EFE6;border-radius:12px;padding:12px 14px"><div style="font-size:22px">🕵️</div><div style="flex:1"><b>The Scout</b> <span style="background:#FFF3E0;color:#B26A00;border-radius:20px;padding:1px 9px;font-size:11px;font-weight:700">BROWSER AGENT — SIGNED IN AS YOU</span><div style="color:#46645A;font-size:13.5px;margin-top:3px">LinkedIn hides its real search — contract filter, last 24 hours, full descriptions — behind a sign-in wall. So a browser agent walks in <i>inside your own signed-in LinkedIn session</i>, runs your filters like a person would, reads each job in full, and hands the jobs to the Shopper. Read-only: it never applies, never saves, never messages — and it stops cold if LinkedIn asks for a security check.</div></div><div style="text-align:right"><div style="font-size:20px;font-weight:800" id="hwLinkedin">–</div><div style="font-size:11px;color:#7A9186">LinkedIn roles audited</div></div></div>
+    <div style="display:flex;gap:12px;align-items:flex-start;background:#F7FBF8;border:1px solid #E3EFE6;border-radius:12px;padding:12px 14px"><div style="font-size:22px">📖</div><div style="flex:1"><b>The Reader</b> <span style="background:#EDE9FE;color:#5B4BC4;border-radius:20px;padding:1px 9px;font-size:11px;font-weight:700">MUSE SPARK — META MODEL API</span><div style="color:#46645A;font-size:13.5px;margin-top:3px">Reads every surviving job description in full and lists exactly what the job demands — skills, tools, years. It only reads; it is not allowed to judge.</div></div><div style="text-align:right"><div style="font-size:20px;font-weight:800" id="hwJudged">–</div><div style="font-size:11px;color:#7A9186">roles read in full</div></div></div>
+    <div style="display:flex;gap:12px;align-items:flex-start;background:#F7FBF8;border:1px solid #E3EFE6;border-radius:12px;padding:12px 14px"><div style="font-size:22px">⚖️</div><div style="flex:1"><b>The Checker</b> <span style="background:#E8F5E9;color:#1B7A43;border-radius:20px;padding:1px 9px;font-size:11px;font-weight:700">PLAIN CODE — NEVER AI</span><div style="color:#46645A;font-size:13.5px;margin-top:3px">The heart of CMM. Takes every demand from the Reader and checks it against your attested profile, one by one: provable = <b>Defensible</b>, unproven = <b>Vulnerable</b>. It knows Snowflake is not Snowpark. An AI can be talked into things; this code cannot — which is why the verdict (pass / set aside) is decided here, never by a model, and never as a score.</div></div><div style="text-align:right"><div style="font-size:20px;font-weight:800" id="hwPass">–</div><div style="font-size:11px;color:#7A9186">roles passed the audit</div></div></div>
+    <div style="display:flex;gap:12px;align-items:flex-start;background:#F7FBF8;border:1px solid #E3EFE6;border-radius:12px;padding:12px 14px"><div style="font-size:22px">✍️</div><div style="flex:1"><b>The Writer</b> <span style="background:#EDE9FE;color:#5B4BC4;border-radius:20px;padding:1px 9px;font-size:11px;font-weight:700">MUSE SPARK — GUARDED</span><div style="color:#46645A;font-size:13.5px;margin-top:3px">Writes the tailored resume for each passed role — but it may only use claims the Checker marked Defensible. The Checker then re-reads the finished resume; one unprovable word and the resume is rejected and rewritten.</div></div><div style="text-align:right"><div style="font-size:20px;font-weight:800" id="hwResumes">–</div><div style="font-size:11px;color:#7A9186">tailored resumes built</div></div></div>
+    <div style="display:flex;gap:12px;align-items:flex-start;background:#F7FBF8;border:1px solid #E3EFE6;border-radius:12px;padding:12px 14px"><div style="font-size:22px">📮</div><div style="flex:1"><b>The Applier</b> <span style="background:#FFF3E0;color:#B26A00;border-radius:20px;padding:1px 9px;font-size:11px;font-weight:700">BROWSER AGENT — ON YOUR CLICK</span><div style="color:#46645A;font-size:13.5px;margin-top:3px">Prepares the complete application package for every passed role. When you press <b>Apply</b> on a Dice role, a browser agent submits it on your own signed-in Dice session and brings back the employer's confirmation, word for word. Roles that apply on a company's own site are prepared for you, and the machine says so honestly instead of pretending.</div></div><div style="text-align:right"><div style="font-size:20px;font-weight:800" id="hwPursuits">–</div><div style="font-size:11px;color:#7A9186">applications prepared</div></div></div>
+    <div style="display:flex;gap:12px;align-items:flex-start;background:#EFF8F1;border:1px solid #CFE8D4;border-radius:12px;padding:12px 14px"><div style="font-size:22px">🧑</div><div style="flex:1"><b>You</b> <span style="background:#1B7A43;color:#fff;border-radius:20px;padding:1px 9px;font-size:11px;font-weight:700">THE HUMAN — FINAL WORD</span><div style="color:#46645A;font-size:13.5px;margin-top:3px">Nothing is ever sent without your click. Your profile is the law the whole machine answers to — change it under <b>Your profile</b>, change the hunt under <b>Your search</b>.</div></div><div style="text-align:right"><div style="font-size:20px;font-weight:800" id="hwApplied">–</div><div style="font-size:11px;color:#7A9186">applied, with proof</div></div></div>
+   </div>
+   <p class="shieldnote" style="margin-top:14px">Where the seats are: the Shopper, Checker, Reader and Writer live inside CMM itself. The two browser-agent seats — Scout and Applier — must work inside <i>your</i> signed-in sessions, because that is the only place LinkedIn and Dice let a member act. In the product, the Scout ships as a small add-on in your own browser, so your login never leaves your machine; in this live demo those seats are worked by CMM's agents so you can watch them happen.</p>
+  </section>
+ </div>
+
  <div id="viewSafety" style="display:none">
   <section class="card" id="safetySec">
    <div class="cardhead" style="font-size:17px">🛡️ Profile Safety Check — your own resume, checked first</div>
@@ -1270,6 +1303,10 @@ function render(){
  document.getElementById('statResumes').textContent=c.resumes;
  document.getElementById('statPursuits').textContent=c.pursuits;
  document.getElementById('statApplied').textContent=c.applied||0;
+ const hwSet=(id,val)=>{const el=document.getElementById(id);if(el)el.textContent=val;};
+ hwSet('hwRaw',c.raw);hwSet('hwJudged',c.judged);hwSet('hwPass',c.pass);
+ hwSet('hwResumes',c.resumes);hwSet('hwPursuits',c.pursuits);hwSet('hwApplied',c.applied||0);
+ hwSet('hwLinkedin',(S.matches||[]).filter(m=>m.source==='linkedin').length);
  document.getElementById('rangeNote').textContent=(S.range_label||'All time')+(S.range==='today'?' — fresh every morning, resets at midnight ET':'')+' · the board below always shows everything still waiting for you, from every day';
  populateProfile();populateSearch();
  document.getElementById('skills').innerHTML=S.skills.map(s=>'<p class="skill"><b>'+esc(s.term)+'</b> — '+esc(s.evidence)+'</p>').join('');
@@ -1350,7 +1387,7 @@ function showDrawer(){
  }
 }
 // ---- sidebar views: one page per click, nothing stacked ----
-function showView(v){['viewMain','viewTargets','viewProfile','viewSearch','viewSafety'].forEach(id=>{document.getElementById(id).style.display=(id==='view'+v.charAt(0).toUpperCase()+v.slice(1)?'':'none');});document.querySelectorAll('nav a[data-nav]').forEach(a=>a.classList.toggle('on',a.dataset.nav===v));window.scrollTo({top:0,behavior:'smooth'});}
+function showView(v){['viewMain','viewTargets','viewProfile','viewSearch','viewHow','viewSafety'].forEach(id=>{document.getElementById(id).style.display=(id==='view'+v.charAt(0).toUpperCase()+v.slice(1)?'':'none');});document.querySelectorAll('nav a[data-nav]').forEach(a=>a.classList.toggle('on',a.dataset.nav===v));window.scrollTo({top:0,behavior:'smooth'});}
 document.querySelectorAll('nav a[data-nav]').forEach(a=>a.onclick=e=>{e.preventDefault();showView(a.dataset.nav);if(a.dataset.scroll)setTimeout(()=>{const el=document.getElementById(a.dataset.scroll);if(el)el.scrollIntoView({behavior:'smooth'});},40);});
 document.querySelectorAll('.tab[data-t]').forEach(t=>t.onclick=()=>{tab=t.dataset.t;showDrawer();});
 document.getElementById('closeDrawer').onclick=()=>{cur=null;document.getElementById('drawer').style.display='none';};

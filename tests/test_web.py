@@ -93,6 +93,14 @@ class TestHumanFeed(unittest.TestCase):
                         next(i for i, t in enumerate(titles)
                              if t.startswith("Worth your time")))
 
+    def test_linkedin_sweep_narrated_as_browser_scout(self):
+        steps = web.human_feed([{
+            "ts": "2026-10-28T20:52:00+00:00", "actor": "sweeper",
+            "message": "linkedin: 8 fetched, 8 new raw postings"}])
+        self.assertEqual(len(steps), 1)
+        self.assertIn("browser scout", steps[0]["title"])
+        self.assertIn("signed-in", steps[0]["text"])
+
     def test_noise_and_paths_gone(self):
         blob = " ".join(s["title"] + " " + s["text"] for s in self.feed())
         for junk in ("tokens", "streaming", "chunks", "matches/",
@@ -235,6 +243,10 @@ class TestServer(unittest.TestCase):
         self.assertIn('id="saveProfile"', body)
         self.assertIn('id="pSkills"', body)
         self.assertIn('data-nav="search"', body)
+        self.assertIn('data-nav="how"', body)
+        self.assertIn('id="viewHow"', body)
+        self.assertIn("How CMM works", body)
+        self.assertIn('id="hwLinkedin"', body)
         self.assertIn('id="saveSearch"', body)
         self.assertIn('id="sKeywords"', body)
         self.assertNotIn("Save my profile &amp; search", body)
