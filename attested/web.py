@@ -722,6 +722,9 @@ class UI:
             cand = line.strip().strip("#").strip()
             if not cand:
                 continue
+            # A resume's first line is usually 'Name — Title (note)':
+            # the name is the part before the first dash or bracket.
+            cand = re.split(r"\s+[—–(]", cand)[0].strip()
             words = cand.split()
             if (2 <= len(words) <= 5 and "@" not in cand
                     and not any(ch.isdigit() for ch in cand)
