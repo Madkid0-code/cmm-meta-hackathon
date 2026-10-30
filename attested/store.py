@@ -79,6 +79,16 @@ CREATE TABLE IF NOT EXISTS pursuits (
     updated_at TEXT NOT NULL,
     UNIQUE(posting_id, candidate)
 );
+CREATE TABLE IF NOT EXISTS portal_connections (
+    portal TEXT NOT NULL,             -- dice | linkedin
+    candidate TEXT NOT NULL,
+    status TEXT NOT NULL,             -- not_connected | connecting | connected | failed
+    display_name TEXT,                -- the name the portal itself shows; NEVER a credential
+    detail TEXT,
+    connected_at TEXT,
+    updated_at TEXT NOT NULL,
+    PRIMARY KEY (portal, candidate)
+);
 """
 
 
@@ -220,3 +230,61 @@ def pursuits_for(db, candidate):
         "SELECT pu.*, p.title, p.company, p.source FROM pursuits pu"
         " JOIN job_postings p ON p.id = pu.posting_id"
         " WHERE pu.candidate=? ORDER BY pu.id", (candidate,)).fetchall()
+
+
+# -- portal connections -------------------------------------------------
+# A connection records THAT a portal session exists and the name the
+# portal itself displays. Credentials and cookies are never stored —
+# the seeker signs in on the portal's own page, inside their session.
+PORTALS = ("dice", "linkedin")
+
+
+def get_connection(db, portal, candidate):
+    return db.execute(
+        "SELECT * FROM portal_connections WHERE portal=? AND candidate=?",
+        (portal, candidate)).fetchone()
+
+
+def connections_for(db, candidate):
+    """{portal: {status, display_name, detail, connected_at}} for every
+    known portal, defaulting to not_connected when no row exists."""
+    out = {p: {"status": "not_connected", "display_name": None,
+               "detail": None, "connected_at": None} for p in PORTALS}
+    try:
+        rows = db.execute(
+            "SELECT * FROM portal_connections WHERE candidate=?",
+            (candidate,)).fetchall()
+    except Exception:
+        return out  # pre-connections store: everything reads unconnected
+    for row in rows:
+        if row["portal"] in out:
+            out[row["portal"]] = {
+                "status": row["status"],
+                "display_name": row["display_name"],
+                "detail": row["detail"],
+                "connected_at": row["connected_at"],
+            }
+    return out
+
+
+def set_connection(db, portal, candidate, status, display_name=None,
+                   detail=None):
+    if portal not in PORTALS:
+        raise ValueError(f"unknown portal: {portal}")
+    now = now_iso()
+    connected_at = now if status == "connected" else None
+    db.execute(
+        "INSERT INTO portal_connections (portal, candidate, status,"
+        " display_name, detail, connected_at, updated_at)"
+        " VALUES (?, ?, ?, ?, ?, ?, ?)"
+        " ON CONFLICT(portal, candidate) DO UPDATE SET"
+        " status=excluded.status,"
+        " display_name=COALESCE(excluded.display_name,"
+        " portal_connections.display_name),"
+        " detail=excluded.detail,"
+        " connected_at=COALESCE(excluded.connected_at,"
+        " portal_connections.connected_at),"
+        " updated_at=excluded.updated_at",
+        (portal, candidate, status, display_name, detail, connected_at,
+         now))
+    db.commit()

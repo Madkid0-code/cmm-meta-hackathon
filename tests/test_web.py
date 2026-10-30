@@ -471,6 +471,12 @@ class TestServer(unittest.TestCase):
         db.commit()
         pid = db.execute("SELECT posting_id FROM pursuits LIMIT 1").fetchone()[0]
         db.close()
+        # The fixture pursuit is a Dice application: since the connect
+        # build, Apply requires Dice connected first (just-in-time rule).
+        cdb = store.connect(os.path.join(self.out, "attested.db"))
+        store.set_connection(cdb, "dice", "Test Person", "connected",
+                             display_name="Test Person")
+        cdb.close()
         ok, info = self.ui.request_apply(pid)
         self.assertTrue(ok, info)
         db = _sq.connect(os.path.join(self.out, "attested.db"))
@@ -479,6 +485,48 @@ class TestServer(unittest.TestCase):
         self.assertEqual(status, "apply_requested")
         ok, _ = self.ui.request_apply(pid)
         self.assertFalse(ok)  # cannot queue twice
+
+    def test_connections_lifecycle_and_state(self):
+        st = self.ui.state()
+        self.assertEqual(st["connections"]["dice"]["status"], "not_connected")
+        self.assertEqual(st["connections"]["linkedin"]["status"],
+                         "not_connected")
+        ok, info = self.ui.connect_portal("dice")
+        self.assertTrue(ok, info)
+        st = self.ui.state()
+        self.assertEqual(st["connections"]["dice"]["status"], "connecting")
+        # The agent layer completes the sign-in and writes back the name
+        # the portal itself displays.
+        db = store.connect(os.path.join(self.out, "attested.db"))
+        store.set_connection(db, "dice", "Test Person", "connected",
+                             display_name="Test Person")
+        db.close()
+        st = self.ui.state()
+        self.assertEqual(st["connections"]["dice"]["status"], "connected")
+        self.assertEqual(st["connections"]["dice"]["display_name"],
+                         "Test Person")
+        self.assertIsNotNone(st["connections"]["dice"]["connected_at"])
+        ok, _ = self.ui.disconnect_portal("dice")
+        self.assertTrue(ok)
+        st = self.ui.state()
+        self.assertEqual(st["connections"]["dice"]["status"], "not_connected")
+        self.assertIsNone(st["connections"]["dice"]["display_name"])
+        ok, _ = self.ui.connect_portal("myspace")
+        self.assertFalse(ok)  # unknown portal refused
+
+    def test_apply_blocked_until_portal_connected(self):
+        import sqlite3 as _sq
+        db = _sq.connect(os.path.join(self.out, "attested.db"))
+        db.execute("UPDATE pursuits SET status='prepared'")
+        db.commit()
+        pid = db.execute("SELECT posting_id FROM pursuits LIMIT 1").fetchone()[0]
+        db.close()
+        ok, info = self.ui.request_apply(pid)
+        self.assertFalse(ok)
+        self.assertIn("Connect Dice first", info)
+        status = _sq.connect(os.path.join(self.out, "attested.db")).execute(
+            "SELECT status FROM pursuits").fetchone()[0]
+        self.assertEqual(status, "prepared")  # untouched by the refusal
 
     def test_build_missing_starts_rejudge(self):
         import time as _time

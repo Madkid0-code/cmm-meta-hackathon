@@ -471,6 +471,60 @@ class UI:
         with open(os.path.join(self.out_dir, "events.jsonl"), "a") as f:
             f.write(json.dumps(event) + "\n")
 
+    # -- portal connections ------------------------------------------
+    PORTAL_NAMES = {"dice": "Dice", "linkedin": "LinkedIn"}
+
+    def _connections_db(self):
+        """(db, candidate) for the connections table, or (None, name)."""
+        from attested import store as _store
+        form = profile.load_form(self.form_path)
+        db_path = os.path.join(self.out_dir, "attested.db")
+        if not os.path.exists(db_path):
+            _store.connect(db_path).close()
+        return _store.connect(db_path), form["name"]
+
+    def connect_portal(self, portal):
+        """The Connect button: record the request; a Muse browser agent
+        opens the portal's OWN sign-in page and the seeker signs in there.
+        CMM never sees or stores the password."""
+        if self.readonly():
+            return False, "View-only preview — connecting is disabled."
+        if portal not in self.PORTAL_NAMES:
+            return False, "Unknown portal."
+        db, candidate = self._connections_db()
+        from attested import store as _store
+        _store.set_connection(db, portal, candidate, "connecting",
+                              detail=None)
+        db.close()
+        name = self.PORTAL_NAMES[portal]
+        self._append_event(
+            "connector",
+            f"Connect {name} pressed — a Muse browser agent is opening "
+            f"{name}'s own sign-in page. You sign in on {name} itself; "
+            "CMM never sees or stores your password.")
+        return True, "connecting"
+
+    def disconnect_portal(self, portal):
+        if self.readonly():
+            return False, "View-only preview — connecting is disabled."
+        if portal not in self.PORTAL_NAMES:
+            return False, "Unknown portal."
+        db, candidate = self._connections_db()
+        from attested import store as _store
+        _store.set_connection(db, portal, candidate, "not_connected",
+                              display_name=None, detail=None)
+        db.execute(
+            "UPDATE portal_connections SET display_name=NULL,"
+            " connected_at=NULL WHERE portal=? AND candidate=?",
+            (portal, candidate))
+        db.commit()
+        db.close()
+        self._append_event(
+            "connector",
+            f"{self.PORTAL_NAMES[portal]} disconnected — the agent "
+            "forgets that session. You can reconnect anytime.")
+        return True, "not_connected"
+
     def request_apply(self, posting_id):
         """The website's Apply button: queue a prepared pursuit for the
         applier worker. The submission itself happens on the seeker's own
@@ -491,6 +545,31 @@ class UI:
         if row[1] != "prepared":
             db.close()
             return False, f"This application is already '{row[1]}'."
+        # Just-in-time connection: submitting happens inside the seeker's
+        # signed-in portal session, so a Dice/LinkedIn application first
+        # needs that portal connected.
+        src = db.execute(
+            "SELECT p.source FROM job_postings p WHERE p.id = ?",
+            (posting_id,)).fetchone()
+        if src and src[0] in self.PORTAL_NAMES:
+            portal = src[0]
+            form = profile.load_form(self.form_path)
+            from attested import store as _store
+            cdb = _store.connect(db_path)
+            conn = _store.get_connection(cdb, portal, form["name"])
+            cdb.close()
+            if conn is None or conn["status"] != "connected":
+                db.close()
+                pname = self.PORTAL_NAMES[portal]
+                self._append_event(
+                    "connector",
+                    f"Apply needs {pname} connected first — applications "
+                    f"go out inside your signed-in {pname} session. "
+                    f"Use Connect {pname} in Your search.")
+                return False, (
+                    f"Connect {pname} first — this application is "
+                    f"submitted inside your signed-in {pname} session. "
+                    f"You'll find Connect {pname} in Your search.")
         db.execute("UPDATE pursuits SET status = 'apply_requested', "
                    "updated_at = ? WHERE id = ?",
                    (datetime.now(timezone.utc).isoformat(timespec="seconds"),
@@ -874,6 +953,9 @@ class UI:
         counts = {"raw": 0, "postings": 0, "judged": 0, "pass": 0,
                   "resumes": 0, "pursuits": 0, "applied": 0}
         matches = []
+        connections = {p: {"status": "not_connected", "display_name": None,
+                           "detail": None, "connected_at": None}
+                       for p in ("dice", "linkedin")}
         if os.path.exists(db_path):
             db = sqlite3.connect(f"file:{db_path}?mode=ro", uri=True)
             db.row_factory = sqlite3.Row
@@ -951,6 +1033,23 @@ class UI:
                     "has_package": os.path.exists(
                         os.path.join(match_dir, "application_package.md")),
                 })
+            connections = {p: {"status": "not_connected",
+                               "display_name": None, "detail": None,
+                               "connected_at": None}
+                           for p in ("dice", "linkedin")}
+            try:
+                for crow in db.execute(
+                        "SELECT portal, status, display_name, detail,"
+                        " connected_at FROM portal_connections"
+                        " WHERE candidate=?", (form["name"],)):
+                    if crow["portal"] in connections:
+                        connections[crow["portal"]] = {
+                            "status": crow["status"],
+                            "display_name": crow["display_name"],
+                            "detail": crow["detail"],
+                            "connected_at": crow["connected_at"]}
+            except Exception:
+                pass  # pre-connections store: everything unconnected
             db.close()
         events = _read_events(os.path.join(self.out_dir, "events.jsonl"), 60)
         if self._ride_active:
@@ -991,6 +1090,7 @@ class UI:
             },
             "counts": counts, "range": range_key,
             "range_label": RANGE_LABELS[range_key],
+            "connections": connections,
             "matches": matches, "events": merged,
             "feed": human_feed(merged),
             "intake": intake,
@@ -1335,6 +1435,7 @@ details.rawlog{margin-top:4px}details.rawlog summary{cursor:pointer;color:var(--
      <div class="fld"><label>Search phrases <span class="hint">comma-separated</span></label><input type="text" id="sKeywords"></div>
      <div class="fld"><label>Match skills <span class="hint">comma-separated — a role stays in only if it asks for ≥2 of these</span></label><input type="text" id="sMatch"></div>
      <div class="fld"><label>Look on</label><div class="srcs" id="sSources"></div></div>
+     <div class="fld" style="grid-column:1/-1"><label>Your accounts <span class="hint">connect a portal and CMM works inside your signed-in session — you sign in on the portal's own page; CMM never sees or stores your password</span></label><div id="connList"></div></div>
      <div class="fld"><label>Job type</label><div class="srcs"><label style="font-weight:400"><input type="checkbox" class="sjt" value="contract"> Contract</label><label style="font-weight:400"><input type="checkbox" class="sjt" value="full_time"> Full-time</label><label style="font-weight:400"><input type="checkbox" class="sjt" value="part_time"> Part-time</label></div><span class="hint">none ticked = any type</span></div>
      <div class="fld"><label>Workplace</label><div class="srcs"><label style="font-weight:400"><input type="checkbox" class="swp" value="remote"> Remote</label><label style="font-weight:400"><input type="checkbox" class="swp" value="hybrid"> Hybrid</label><label style="font-weight:400"><input type="checkbox" class="swp" value="onsite"> On-site</label></div><span class="hint">none ticked = anywhere · posted in the last</span> <select id="sHours"><option value="12">12h</option><option value="24">24h</option><option value="48">48h</option><option value="72">3 days</option><option value="168">7 days</option></select></div>
     </div>
@@ -1420,7 +1521,7 @@ function render(){
  hwSet('hwResumes',c.resumes);hwSet('hwPursuits',c.pursuits);hwSet('hwApplied',c.applied||0);
  hwSet('hwLinkedin',(S.matches||[]).filter(m=>m.source==='linkedin').length);
  document.getElementById('rangeNote').textContent=(S.range_label||'All time')+(S.range==='today'?' — fresh every morning, resets at midnight ET':'')+' · the board below always shows everything still waiting for you, from every day';
- populateProfile();populateSearch();
+ populateProfile();populateSearch();renderConnections();
  document.getElementById('skills').innerHTML=S.skills.map(s=>'<p class="skill"><b>'+esc(s.term)+'</b> — '+esc(s.evidence)+'</p>').join('');
  document.getElementById('never').innerHTML='<b>Your hard boundaries:</b> '+S.boundaries.map(esc).join(' · ');
  const sp=S.spec;
@@ -1608,6 +1709,26 @@ document.getElementById('saveProfile').onclick=async()=>{
 };
 // ---- search editor (Your search): ONLY the sweep, 'Save my search' ----
 let searchSig='',searchDirty=false;
+function renderConnections(){
+ if(!S)return;
+ const names={dice:'Dice',linkedin:'LinkedIn'};
+ const conns=S.connections||{};
+ document.getElementById('connList').innerHTML=['dice','linkedin'].map(p=>{
+  const c=conns[p]||{status:'not_connected'};
+  let pill,btn;
+  if(c.status==='connected'){pill='<span style="color:#0E7A4F;font-weight:700">✓ Connected as '+esc(c.display_name||'')+'</span>';btn='<button class="btn2" data-disconnect="'+p+'" type="button">Disconnect</button>';}
+  else if(c.status==='connecting'){pill='<span style="color:#9A6A00;font-weight:700">⏳ Connecting… sign in on '+names[p]+'’s page — the agent has it open</span>';btn='';}
+  else if(c.status==='failed'){pill='<span style="color:#B3261E;font-weight:700">Couldn’t connect'+(c.detail?' — '+esc(c.detail):'')+'</span>';btn='<button class="btn2" data-connect="'+p+'" type="button">Try again</button>';}
+  else{pill='<span style="color:#5A6B62">Not connected</span>';btn='<button class="btn2" data-connect="'+p+'" type="button">Connect '+names[p]+'</button>';}
+  return '<div style="display:flex;gap:10px;align-items:center;padding:7px 0;border-bottom:1px solid #EEF4F0"><b style="min-width:70px">'+names[p]+'</b>'+pill+'<span style="flex:1"></span>'+btn+'</div>';
+ }).join('');
+ document.querySelectorAll('[data-connect]').forEach(b=>b.onclick=()=>portalConn('api/connect',b.dataset.connect));
+ document.querySelectorAll('[data-disconnect]').forEach(b=>b.onclick=()=>portalConn('api/disconnect',b.dataset.disconnect));
+}
+async function portalConn(path,portal){
+ try{await fetch(path,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({portal})});}catch(e){}
+ _lastSig='';load();
+}
 function populateSearch(){
  if(!S)return;
  const sig=JSON.stringify(S.spec);
@@ -1737,6 +1858,22 @@ def make_handler(ui):
                     self._json({"started": False, "error": "Bad request."}, 400)
                     return
                 ok, info = ui.request_apply(posting)
+                self._json({"started": ok, "status": info} if ok
+                           else {"started": False, "error": info},
+                           200 if ok else 400)
+            elif self.path == "/api/connect" or self.path == "/api/disconnect":
+                try:
+                    length = int(self.headers.get("Content-Length") or 0)
+                    payload = json.loads(self.rfile.read(length) or b"{}")
+                    portal = str(payload.get("portal") or "")
+                except (ValueError, json.JSONDecodeError):
+                    self._json({"started": False, "error": "Bad request."},
+                               400)
+                    return
+                if self.path == "/api/connect":
+                    ok, info = ui.connect_portal(portal)
+                else:
+                    ok, info = ui.disconnect_portal(portal)
                 self._json({"started": ok, "status": info} if ok
                            else {"started": False, "error": info},
                            200 if ok else 400)
