@@ -31,7 +31,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import parse_qs, urlparse
 from zoneinfo import ZoneInfo
 
-from . import meta_client, profile, verifier
+from . import meta_client, profile, store, verifier
 
 ET = ZoneInfo("America/New_York")
 RANGE_KEYS = ("today", "yesterday", "month", "all")
@@ -682,6 +682,103 @@ class UI:
                          f"({form['search']['location']}). "
                          f"The next scan uses these.")
 
+    def profile_resume(self, payload):
+        """The Your-profile upload (owner, 2026-10-30 — 'upload first,
+        then the profile fills in around it'): read the seeker's resume
+        file, audit it against their attested profile with the SAME
+        deterministic guardrail the pipeline runs at intake
+        (verifier.check_draft), and report the claims struck plus the
+        attested skills the resume confirms. The upload becomes the
+        form's raw resume, so the next Scan's intake check re-runs this
+        exact audit in the open. Uploading NEVER edits the attested
+        profile itself: the person reviews the editor and attests with
+        Save my profile — the human attests, the machine only checks."""
+        if self.readonly():
+            return False, {"error": "View-only preview — resume upload "
+                                    "is disabled."}
+        upload = payload.get("resume_upload") or {}
+        if not upload.get("data_b64"):
+            return False, {"error": "Choose a resume file first "
+                                    "(.docx, .pdf, .txt or .md)."}
+        import base64
+        from . import ingest
+        try:
+            text = ingest.extract_text(
+                upload.get("filename", ""),
+                base64.b64decode(upload["data_b64"]))
+        except ValueError as e:
+            return False, {"error": str(e)}
+        except Exception:
+            return False, {"error": "That file could not be read — "
+                                    "try a .docx, .pdf, .txt or .md."}
+        form = profile.load_form(self.form_path)
+        profile_text = profile.render_profile_md(form)
+        attested = verifier.parse_profile(profile_text)
+        strikes = verifier.check_draft(text, attested, profile_text)
+        low = text.lower()
+        confirmed = [t for t in attested if t.lower() in low]
+        name_detected = None
+        for line in text.splitlines():
+            cand = line.strip().strip("#").strip()
+            if not cand:
+                continue
+            words = cand.split()
+            if (2 <= len(words) <= 5 and "@" not in cand
+                    and not any(ch.isdigit() for ch in cand)
+                    and len(cand) <= 60):
+                name_detected = cand
+            break
+        form_dir = os.path.dirname(os.path.abspath(self.form_path))
+        with open(os.path.join(form_dir, "uploaded_resume.md"), "w") as f:
+            f.write(text)
+        form["raw_resume_file"] = "uploaded_resume.md"
+        with open(self.form_path, "w") as f:
+            json.dump(form, f, indent=1)
+        self._append_event(
+            "guardrail",
+            f"Resume uploaded on Your profile — intake check struck "
+            f"{len(strikes)} claim(s); the resume confirms "
+            f"{len(confirmed)} attested skill(s).")
+        return True, {"strikes": strikes, "confirmed": confirmed,
+                      "name_detected": name_detected,
+                      "skills_total": len(attested)}
+
+    def reset_demo(self):
+        """Reset demo (owner, 2026-10-30): wipe the demo account's
+        pipeline back to empty — every posting, match, built resume and
+        pursuit, plus the generated dossier files, the event feed and
+        the call queue — so a fresh run (or a demo take) starts from a
+        truly blank board. The PERSON stays: form, attested profile and
+        the scout's inbox deposits are the account, not the run.
+        Home store only; never during a run."""
+        if self.readonly():
+            return False, "View-only preview — reset is disabled."
+        if os.path.abspath(self.form_path) != os.path.abspath(self._home_form):
+            return False, "Reset belongs to the demo account, not a ride."
+        if any(self._running.values()):
+            return False, ("A run is in progress — let it finish (or stop "
+                           "it) before resetting.")
+        db = store.connect(os.path.join(self.out_dir, "attested.db"))
+        try:
+            for table in ("pursuits", "candidate_resumes",
+                          "candidate_matches", "job_postings",
+                          "job_posting_raw", "sweep_configs"):
+                db.execute(f"DELETE FROM {table}")
+            db.commit()
+        finally:
+            db.close()
+        import shutil
+        matches_dir = os.path.join(self.out_dir, "matches")
+        if os.path.isdir(matches_dir):
+            shutil.rmtree(matches_dir)
+        for name in ("events.jsonl", "call_queue.md"):
+            path = os.path.join(self.out_dir, name)
+            if os.path.exists(path):
+                os.remove(path)
+        self._append_event("system", "Demo reset — the board is empty. "
+                                     "A fresh run starts from nothing.")
+        return True, "reset"
+
     # -- the ride: a visitor's own form -> their own store -> full flow --
     def start_ride(self, payload):
         """Validate a submitted onboarding form, write it as a ride, switch
@@ -1169,6 +1266,7 @@ details.rawlog{margin-top:4px}details.rawlog summary{cursor:pointer;color:var(--
     <span id="runState" style="display:none"><span class="pulse"></span> <b id="runStateTxt">Running…</b></span>
     <button class="btn2" id="runFixture">Watch One Role Audited Live (~35 sec)</button>
     <button class="btnStop" id="btnStop" style="display:none">⏹ Stop</button>
+    <button class="btn2" id="resetDemo" title="Wipe every found job, resume and application — your profile and search stay">⟲ Reset demo</button>
     <button class="btn1" id="runSweep">▶ Scan for New Roles</button>
    </div>
   </div>
@@ -1197,6 +1295,17 @@ details.rawlog{margin-top:4px}details.rawlog summary{cursor:pointer;color:var(--
   <section class="card" id="profileSec">
    <div class="cardhead" style="font-size:17px">Your Attested Profile</div>
    <div style="margin-top:12px" id="skills"></div><div class="never" id="never"></div>
+   <div style="border-top:1px solid #EEF4F0;margin-top:16px;padding-top:14px">
+    <div class="cardhead" style="font-size:15px">📄 Start with your resume</div>
+    <p class="shieldnote">Upload the resume you were about to send. The machine reads it and checks every claim against your attested profile below — claims it cannot back get struck in the open, and the skills your resume does back are confirmed. The profile then fills in around the upload: review it, and attest with <b>Save my profile</b>. Uploading never changes your profile by itself — you stay the one who attests.</p>
+    <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+      <input type="file" id="prFile" accept=".docx,.pdf,.txt,.md">
+      <button class="btn1" id="prUpload" type="button">Upload &amp; check my resume</button>
+      <span class="hint" id="prFileName"></span>
+    </div>
+    <div id="prResult" style="display:none;margin-top:12px"></div>
+    <div class="err" id="prErr"></div>
+   </div>
    <div style="border-top:1px solid #EEF4F0;margin-top:16px;padding-top:14px">
     <div class="cardhead" style="font-size:15px">✏️ Update your profile</div>
     <p class="shieldnote">This is you — the skills you can defend and the lines you will not cross. Change anything and hit <b>Save my profile</b>. Your search settings live under <b>Your search</b>, with their own save. Jobs already found, resumes already built, and applications already sent are not changed.</p>
@@ -1392,6 +1501,31 @@ document.querySelectorAll('nav a[data-nav]').forEach(a=>a.onclick=e=>{e.preventD
 document.querySelectorAll('.tab[data-t]').forEach(t=>t.onclick=()=>{tab=t.dataset.t;showDrawer();});
 document.getElementById('closeDrawer').onclick=()=>{cur=null;document.getElementById('drawer').style.display='none';};
 document.getElementById('runSweep').onclick=async()=>{await fetch('api/run',{method:'POST'});load();};
+document.getElementById('resetDemo').onclick=async()=>{if(!confirm('Reset the demo? Every found job, built resume and application on this board is wiped. Your profile and your search stay exactly as they are.'))return;try{const r=await fetch('api/reset-demo',{method:'POST'});const j=await r.json();if(!j.ok){alert(j.error||'Could not reset.');return;}}catch(e){alert('Could not reach the server.');return;}cur=null;_lastSig='';load();};
+// ---- profile resume upload: audit + fill-in (Your profile) ----
+document.getElementById('prFile').addEventListener('change',e=>{const f=e.target.files&&e.target.files[0];document.getElementById('prFileName').textContent=f?('Selected: '+f.name):'';});
+document.getElementById('prUpload').onclick=async()=>{
+ const err=document.getElementById('prErr');err.style.display='none';
+ const inp=document.getElementById('prFile');const f=inp.files&&inp.files[0];
+ if(!f){err.textContent='Choose a resume file first.';err.style.display='block';return;}
+ const btn=document.getElementById('prUpload');btn.disabled=true;btn.textContent='Checking…';
+ try{
+  const buf=await f.arrayBuffer();const bytes=new Uint8Array(buf);let bin='';
+  for(let i=0;i<bytes.length;i+=32768){bin+=String.fromCharCode.apply(null,bytes.subarray(i,i+32768));}
+  const r=await fetch('api/profile-resume',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({resume_upload:{filename:f.name,data_b64:btoa(bin)}})});
+  const j=await r.json();
+  if(!j.ok){err.textContent=j.error||'Could not check that resume.';err.style.display='block';}
+  else{
+   const box=document.getElementById('prResult');box.style.display='block';let h='';
+   if(j.name_detected){document.getElementById('pName').value=j.name_detected;profDirty=true;h+='<p class="shieldnote">We read the name on the resume as <b>'+esc(j.name_detected)+'</b> — it is filled into your profile below; change it there if it is wrong.</p>';}
+   if(j.strikes&&j.strikes.length){h+='<div class="auditbox"><b>🛡️ Intake check — '+j.strikes.length+' claim'+(j.strikes.length>1?'s':'')+' struck:</b>'+j.strikes.map(s=>'<div style="margin-top:4px"><b>'+esc(s.term)+'</b> — '+esc(s.detail)+'</div>').join('')+'</div>';}
+   else{h+='<p class="shieldnote">🛡️ Intake check: nothing struck — every claim in this resume is backed by your attested profile.</p>';}
+   if(j.confirmed&&j.confirmed.length){h+='<p class="shieldnote" style="margin-top:8px">✓ Your resume backs <b>'+j.confirmed.length+' of your '+j.skills_total+' attested skills</b>: '+j.confirmed.map(esc).join(', ')+'.</p>';}
+   box.innerHTML=h;_lastSig='';load();
+  }
+ }catch(e){err.textContent='Could not reach the server.';err.style.display='block';}
+ btn.disabled=false;btn.textContent='Upload & check my resume';
+};
 document.getElementById('runFixture').onclick=async()=>{await fetch('api/run_fixture',{method:'POST'});load();};
 // ---- the ride form ----
 let ridePrefilled=false;
@@ -1632,6 +1766,25 @@ def make_handler(ui):
                 ok, info = ui.update_search(payload)
                 self._json({"saved": ok} if ok
                            else {"saved": False, "error": info},
+                           200 if ok else 400)
+            elif self.path == "/api/profile-resume":
+                try:
+                    length = int(self.headers.get("Content-Length") or 0)
+                    payload = json.loads(self.rfile.read(length) or b"{}")
+                except (ValueError, json.JSONDecodeError):
+                    self._json({"ok": False, "error": "Bad form data."}, 400)
+                    return
+                ok, info = ui.profile_resume(payload)
+                if ok:
+                    self._json({"ok": True, **info})
+                else:
+                    self._json({"ok": False,
+                                "error": info.get("error", "Upload failed.")},
+                               400)
+            elif self.path == "/api/reset-demo":
+                ok, info = ui.reset_demo()
+                self._json({"ok": ok} if ok
+                           else {"ok": False, "error": info},
                            200 if ok else 400)
             elif self.path == "/api/ride":
                 try:

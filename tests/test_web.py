@@ -506,6 +506,65 @@ class TestServer(unittest.TestCase):
         finally:
             del os.environ["ATTESTED_READONLY"]
 
+    def test_profile_resume_upload_audits_and_reports_fill_in(self):
+        # Owner (2026-10-30): upload first on Your profile — the SAME
+        # deterministic intake audit the pipeline runs strikes the
+        # upload's unbacked claims, confirms the attested skills the
+        # resume really shows, detects the name for the fill-in, and
+        # the upload becomes the form's raw resume. The attested
+        # profile itself must NOT change (the human attests at Save).
+        import base64
+        draft = ("Test Person\n\nData Engineer skilled in Python and SQL. "
+                 "Built Kafka streaming pipelines and improved pipeline "
+                 "performance by 40%.\n")
+        ok, info = self.ui.profile_resume({
+            "resume_upload": {"filename": "resume.md",
+                              "data_b64": base64.b64encode(
+                                  draft.encode()).decode()}})
+        self.assertTrue(ok, info)
+        struck = {s["term"].lower() for s in info["strikes"]}
+        self.assertIn("kafka", struck)
+        self.assertIn("40%", struck)
+        self.assertEqual({c.lower() for c in info["confirmed"]},
+                         {"python", "sql"})
+        self.assertEqual(info["name_detected"], "Test Person")
+        saved = json.load(open(self.form_path))
+        self.assertEqual(saved["raw_resume_file"], "uploaded_resume.md")
+        self.assertEqual(saved["name"], "Test Person")
+        self.assertTrue(os.path.exists(
+            os.path.join(self.tmp, "uploaded_resume.md")))
+
+    def test_profile_resume_upload_rejects_missing_file(self):
+        ok, info = self.ui.profile_resume({})
+        self.assertFalse(ok)
+        self.assertIn("Choose a resume file", info["error"])
+
+    def test_reset_demo_empties_pipeline_keeps_person(self):
+        # Owner (2026-10-30): reset wipes the RUN (postings, matches,
+        # resumes, pursuits, feed) and keeps the ACCOUNT (the form).
+        before = self.ui.state("all")["counts"]
+        self.assertGreater(before["judged"], 0)
+        self.assertGreater(before["pursuits"], 0)
+        ok, info = self.ui.reset_demo()
+        self.assertTrue(ok, info)
+        after = self.ui.state("all")["counts"]
+        for key in ("raw", "postings", "judged", "pass", "resumes",
+                    "pursuits", "applied"):
+            self.assertEqual(after[key], 0, key)
+        self.assertEqual(self.ui.state()["candidate"], "Test Person")
+        self.assertFalse(os.path.exists(
+            os.path.join(self.out, "call_queue.md")))
+        feed = self.ui.state()["feed"]
+        self.assertTrue(any("Demo reset" in s["text"] or
+                            "Demo reset" in s["title"] for s in feed))
+
+    def test_page_has_upload_and_reset_controls(self):
+        status, body = self._get("/")
+        self.assertEqual(status, 200)
+        self.assertIn('id="prFile"', body)
+        self.assertIn('id="prUpload"', body)
+        self.assertIn('id="resetDemo"', body)
+
     def test_doc_traversal_blocked(self):
         status, _ = self._get("/api/doc?posting=..%2F..&kind=resume")
         self.assertIn(status, (400, 404))

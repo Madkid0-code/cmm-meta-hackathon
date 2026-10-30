@@ -204,6 +204,21 @@ python3 run_web.py 8765                # http://127.0.0.1:8765
   the sidebar: **Your profile** (the person — *Save my profile*) and
   **Your search** (the sweep — *Save my search*). Neither save can
   clobber the other.
+- **Upload first, profile fills in**: Your profile opens with a resume
+  upload. The file is read on the server (`attested/ingest.py`) and
+  audited against the attested profile by the same deterministic
+  guardrail the pipeline runs at intake (`verifier.check_draft`) — the
+  page shows the claims struck and the attested skills the resume
+  confirms, and the name read from the resume is filled into the
+  editor. The upload becomes the form's raw resume, so the next scan's
+  intake check re-runs the identical audit in the open. Uploading never
+  edits the profile by itself: the human reviews and attests with
+  *Save my profile*.
+- **Reset demo**: the board carries a *⟲ Reset demo* button that wipes
+  the run — postings, matches, built resumes, pursuits, generated
+  dossiers, the event feed — back to a blank board, so a fresh run (or
+  a demo take) starts from nothing. The account itself (form, attested
+  profile, scout deposits) is not a run and is never wiped.
 - **Built resumes are deliverables**: every tailored resume downloads as
   an editable **Word (.docx)** or **PDF** (generated stdlib-only —
   `attested/export.py`), from the resume tab of its dossier.
