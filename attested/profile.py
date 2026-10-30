@@ -19,10 +19,11 @@ def load_form(path):
     for key in ("name", "search", "attested_skills"):
         if key not in form:
             raise ValueError(f"form is missing '{key}'")
-    if not form["search"].get("keywords"):
-        raise ValueError("form search.keywords must not be empty")
-    if not form["attested_skills"]:
-        raise ValueError("form attested_skills must not be empty")
+    # A brand-new account starts empty: no keywords and no attested skills
+    # yet. The UI renders the empty editors so the seeker can create their
+    # profile; the chain only runs once they save and scan.
+    form["search"].setdefault("keywords", [])
+    form.setdefault("attested_skills", [])
     return form
 
 
