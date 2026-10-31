@@ -499,9 +499,10 @@ class UI:
         name = self.PORTAL_NAMES[portal]
         self._append_event(
             "connector",
-            f"Connect {name} pressed — a Muse browser agent is opening "
-            f"{name}'s own sign-in page. You sign in on {name} itself; "
-            "CMM never sees or stores your password.")
+            f"Connect {name} pressed — {name}'s own sign-in page opens "
+            f"in a new tab in your browser; sign in there. A Muse "
+            f"browser agent confirms the connection and this card flips "
+            "to Connected. CMM never sees or stores your password.")
         return True, "connecting"
 
     def disconnect_portal(self, portal):
@@ -1435,7 +1436,7 @@ details.rawlog{margin-top:4px}details.rawlog summary{cursor:pointer;color:var(--
      <div class="fld"><label>Search phrases <span class="hint">comma-separated</span></label><input type="text" id="sKeywords"></div>
      <div class="fld"><label>Match skills <span class="hint">comma-separated — a role stays in only if it asks for ≥2 of these</span></label><input type="text" id="sMatch"></div>
      <div class="fld"><label>Look on</label><div class="srcs" id="sSources"></div></div>
-     <div class="fld" style="grid-column:1/-1"><label>Your accounts <span class="hint">connect a portal and CMM works inside your signed-in session — you sign in on the portal's own page; CMM never sees or stores your password</span></label><div id="connList"></div></div>
+     <div class="fld" style="grid-column:1/-1"><label>Your accounts <span class="hint">press Connect and the portal's own sign-in page opens in a new tab — you sign in there yourself; CMM never sees or stores your password</span></label><div id="connList"></div></div>
      <div class="fld"><label>Job type</label><div class="srcs"><label style="font-weight:400"><input type="checkbox" class="sjt" value="contract"> Contract</label><label style="font-weight:400"><input type="checkbox" class="sjt" value="full_time"> Full-time</label><label style="font-weight:400"><input type="checkbox" class="sjt" value="part_time"> Part-time</label></div><span class="hint">none ticked = any type</span></div>
      <div class="fld"><label>Workplace</label><div class="srcs"><label style="font-weight:400"><input type="checkbox" class="swp" value="remote"> Remote</label><label style="font-weight:400"><input type="checkbox" class="swp" value="hybrid"> Hybrid</label><label style="font-weight:400"><input type="checkbox" class="swp" value="onsite"> On-site</label></div><span class="hint">none ticked = anywhere · posted in the last</span> <select id="sHours"><option value="12">12h</option><option value="24">24h</option><option value="48">48h</option><option value="72">3 days</option><option value="168">7 days</option></select></div>
     </div>
@@ -1717,7 +1718,7 @@ function renderConnections(){
   const c=conns[p]||{status:'not_connected'};
   let pill,btn;
   if(c.status==='connected'){pill='<span style="color:#0E7A4F;font-weight:700">✓ Connected as '+esc(c.display_name||'')+'</span>';btn='<button class="btn2" data-disconnect="'+p+'" type="button">Disconnect</button>';}
-  else if(c.status==='connecting'){pill='<span style="color:#9A6A00;font-weight:700">⏳ Connecting… sign in on '+names[p]+'’s page — the agent has it open</span>';btn='';}
+  else if(c.status==='connecting'){pill='<span style="color:#9A6A00;font-weight:700">⏳ Connecting… '+names[p]+'’s sign-in page is open in a new tab — sign in there; this flips to ✓ Connected once you’re in (a minute or two)</span>';btn='';}
   else if(c.status==='failed'){pill='<span style="color:#B3261E;font-weight:700">Couldn’t connect'+(c.detail?' — '+esc(c.detail):'')+'</span>';btn='<button class="btn2" data-connect="'+p+'" type="button">Try again</button>';}
   else{pill='<span style="color:#5A6B62">Not connected</span>';btn='<button class="btn2" data-connect="'+p+'" type="button">Connect '+names[p]+'</button>';}
   return '<div style="display:flex;gap:10px;align-items:center;padding:7px 0;border-bottom:1px solid #EEF4F0"><b style="min-width:70px">'+names[p]+'</b>'+pill+'<span style="flex:1"></span>'+btn+'</div>';
@@ -1726,6 +1727,14 @@ function renderConnections(){
  document.querySelectorAll('[data-disconnect]').forEach(b=>b.onclick=()=>portalConn('api/disconnect',b.dataset.disconnect));
 }
 async function portalConn(path,portal){
+ if(path==='api/connect'){
+  // The click must DO something the seeker can see: open the portal's own
+  // sign-in page in a new tab in THEIR browser, synchronously inside the
+  // click so popup blockers allow it. They sign in on the portal itself;
+  // the card here flips to Connected once the agent layer confirms it.
+  const loginUrls={dice:'https://www.dice.com/dashboard/login',linkedin:'https://www.linkedin.com/login'};
+  if(loginUrls[portal])window.open(loginUrls[portal],'_blank');
+ }
  try{await fetch(path,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({portal})});}catch(e){}
  _lastSig='';load();
 }
