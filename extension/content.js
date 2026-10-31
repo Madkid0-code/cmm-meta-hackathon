@@ -34,34 +34,82 @@
     return el ? (el.textContent || "").replace(/\s+/g, " ").trim() : "";
   }
 
+  // Verified markers (inspected on the real signed-in pages,
+  // 2026-10-31): on BOTH portals the signed-in profile photo carries
+  // alt="<full account name>" exactly, and each portal's account
+  // control is labelled with the full name. Those are tried first;
+  // generic text scanning is only a last resort.
+
+  // Strategy A (both portals): profile-photo alt text inside the
+  // page's own chrome (header / nav / sidebar) — never feed content,
+  // where other people's avatars also carry name alts.
+  function detectByPhotoAlt() {
+    var scopes = document.querySelectorAll("header, nav, aside");
+    for (var s = 0; s < scopes.length; s++) {
+      var imgs = scopes[s].querySelectorAll("img[alt]");
+      for (var i = 0; i < imgs.length; i++) {
+        var alt = (imgs[i].getAttribute("alt") || "").trim();
+        if (looksLikeName(alt)) return alt;
+      }
+    }
+    return null;
+  }
+
   // -- LinkedIn ------------------------------------------------------
   function detectLinkedIn() {
-    // The feed's left identity card links to your own /in/<slug> with
-    // your name as the link text (rendered more than once: photo+name).
+    var byAlt = detectByPhotoAlt();
+    if (byAlt) return byAlt;
+    // The identity card's profile link is aria-labelled
+    // "View <Name>’s profile" — strip the wrapper, keep the name.
     var links = document.querySelectorAll('a[href*="/in/"]');
     for (var i = 0; i < links.length; i++) {
-      var a = links[i];
-      var r = a.getBoundingClientRect();
-      if (r.top > 500) continue; // identity card sits near the top
+      var label = links[i].getAttribute("aria-label") || "";
+      var m = /^View (.+?)(?:’s|') profile$/.exec(label.trim());
+      if (m && looksLikeName(m[1])) return m[1].trim();
+    }
+    // The top-nav "Me" button's accessible name is "<Name> Me".
+    var btns = document.querySelectorAll("header button, nav button");
+    for (var b = 0; b < btns.length; b++) {
+      var bl = (btns[b].getAttribute("aria-label") || "").trim();
+      if (/ Me$/.test(bl)) {
+        var cand = bl.replace(/ Me$/, "");
+        if (looksLikeName(cand)) return cand;
+      }
+    }
+    // Fallback: identity-card link text near the top of the page.
+    for (var j = 0; j < links.length; j++) {
+      var a = links[j];
+      if (a.getBoundingClientRect().top > 500) continue;
       var t = textOf(a);
       if (looksLikeName(t)) return t;
-      // Name may live in a child heading inside the link.
       var inner = a.querySelector("div, span, h3");
       if (inner && looksLikeName(textOf(inner))) return textOf(inner);
-    }
-    // Fallback: any top-of-page /in/ link with a name-like label.
-    for (var j = 0; j < links.length; j++) {
-      var t2 = textOf(links[j]);
-      if (looksLikeName(t2)) return t2;
     }
     return null;
   }
 
   // -- Dice ----------------------------------------------------------
   function detectDice() {
-    // Dice's signed-in header carries an account menu whose contents
-    // include the full name; scan header/nav scopes first, preferring
-    // elements near an account/profile control.
+    // The account control: <nav aria-label="Account"> holds a button
+    // whose label is "<FULL NAME> <initials>" (e.g. "… MOHAMMED SM").
+    var nav = document.querySelector('nav[aria-label="Account"]');
+    if (nav) {
+      var btn = nav.querySelector("button");
+      if (btn) {
+        var raw = (btn.getAttribute("aria-label") || textOf(btn))
+          .replace(/\s+/g, " ").trim();
+        // Drop trailing initial tokens (1-2 uppercase letters).
+        var parts = raw.split(" ");
+        while (parts.length > 2 && /^[A-Z]{1,2}$/.test(parts[parts.length - 1])) {
+          parts.pop();
+        }
+        var nm = parts.join(" ");
+        if (looksLikeName(nm)) return nm;
+      }
+    }
+    var byAlt = detectByPhotoAlt();
+    if (byAlt) return byAlt;
+    // Fallback: leaf-node text scan inside header/nav scopes.
     var scopes = document.querySelectorAll(
       "header, nav, [data-testid*='header'], [class*='header']");
     for (var s = 0; s < scopes.length; s++) {
