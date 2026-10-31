@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<style>
+  body { font-family: system-ui, sans-serif; width: 300px; margin: 12px; color: #17352A; }
+  h1 { font-size: 15px; margin: 0 0 6px; }
+  p { font-size: 12px; color: #5A6B62; margin: 4px 0; }
+  label { font-size: 12px; font-weight: 600; display: block; margin-top: 10px; }
+  input { width: 100%; box-sizing: border-box; padding: 6px 8px; margin-top: 4px;
+          border: 1px solid #BFD8CC; border-radius: 6px; font-size: 13px; }
+  button { margin-top: 10px; padding: 7px 12px; border: 0; border-radius: 6px;
+           background: #0E7A4F; color: #fff; font-weight: 700; cursor: pointer; }
+  button.secondary { background: #E7F2EC; color: #17352A; }
+  #status { font-size: 12px; margin-top: 10px; padding: 8px; border-radius: 6px;
+            background: #F4FAF6; border: 1px solid #E1EFE7; display: none; }
+</style>
+</head>
+<body>
+  <h1>🦉 CMM Scout</h1>
+  <p>Scout confirms your CMM connection from <b>your own browser</b>:
+     it reads the name Dice/LinkedIn shows you and sends only that name
+     to CMM. It never reads or sends your password.</p>
+  <label>Pairing code (from CMM → Your search → Your accounts)</label>
+  <input id="code" placeholder="e.g. K7QX4MNP" autocomplete="off">
+  <label>CMM address</label>
+  <input id="cmmUrl" autocomplete="off">
+  <button id="save">Save pairing</button>
+  <button id="confirm" class="secondary">Confirm now</button>
+  <div id="status"></div>
+  <script src="popup.js"></script>
+</body>
+</html>

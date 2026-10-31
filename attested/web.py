@@ -493,16 +493,27 @@ class UI:
             return False, "Unknown portal."
         db, candidate = self._connections_db()
         from attested import store as _store
+        own_browser = _store.get_scout_code(db, candidate) is not None
         _store.set_connection(db, portal, candidate, "connecting",
-                              detail=None)
+                              detail="own_browser" if own_browser else None)
         db.close()
         name = self.PORTAL_NAMES[portal]
-        self._append_event(
-            "connector",
-            f"Connect {name} pressed — {name}'s own sign-in page opens "
-            f"in a new tab in your browser; sign in there. A Muse "
-            f"browser agent confirms the connection and this card flips "
-            "to Connected. CMM never sees or stores your password.")
+        if own_browser:
+            self._append_event(
+                "connector",
+                f"Connect {name} pressed — {name}'s own sign-in page "
+                f"opens in a new tab in your browser; sign in there. "
+                "CMM Scout confirms it from your own browser — no "
+                "agent involved. CMM never sees or stores your "
+                "password.")
+        else:
+            self._append_event(
+                "connector",
+                f"Connect {name} pressed — {name}'s own sign-in page "
+                f"opens in a new tab in your browser; sign in there. "
+                f"A Muse browser agent confirms the connection and "
+                "this card flips to Connected. CMM never sees or "
+                "stores your password.")
         return True, "connecting"
 
     def disconnect_portal(self, portal):
@@ -525,6 +536,84 @@ class UI:
             f"{self.PORTAL_NAMES[portal]} disconnected — the agent "
             "forgets that session. You can reconnect anytime.")
         return True, "not_connected"
+
+    # -- CMM Scout: confirmation inside the seeker's OWN browser -------
+    # The Scout browser helper lives in the seeker's browser, paired by
+    # a one-time code. It reads the name the portal itself displays in
+    # that browser and posts it here. From pairing on, connections are
+    # confirmed with NO agent and NO saved login on CMM's side — the
+    # session never leaves the seeker's browser, and CMM stores only
+    # portal / status / displayed name, exactly like the agent path.
+    def scout_state(self):
+        db, candidate = self._connections_db()
+        from attested import store as _store
+        code = _store.get_scout_code(db, candidate)
+        db.close()
+        return {"paired": code is not None, "code": code}
+
+    def generate_scout_code(self):
+        if self.readonly():
+            return False, "View-only preview — pairing is disabled."
+        db, candidate = self._connections_db()
+        from attested import store as _store
+        import secrets
+        alphabet = "ABCDEFGHJKMNPQRSTUVWXYZ23456789"
+        code = "".join(secrets.choice(alphabet) for _ in range(8))
+        _store.set_scout_code(db, candidate, code)
+        db.close()
+        self._append_event(
+            "connector",
+            "CMM Scout pairing code created — from now on, Connect "
+            "confirms inside your own browser. No agent, no saved "
+            "login on CMM's side.")
+        return True, code
+
+    def confirm_connection(self, portal, code, display_name):
+        """CMM Scout posts here from the seeker's own browser: the
+        portal page there shows the seeker signed in as display_name.
+        The pairing code is the only credential — it identifies whose
+        browser this is, never a portal password."""
+        if portal not in self.PORTAL_NAMES:
+            return False, "Unknown portal."
+        name = " ".join(str(display_name or "").split())[:80]
+        if not name:
+            return False, "No signed-in name was reported."
+        db, _candidate = self._connections_db()
+        from attested import store as _store
+        owner = _store.candidate_for_scout_code(db, str(code or ""))
+        if owner is None:
+            db.close()
+            return False, "Pairing code not recognised."
+        _store.set_connection(db, portal, owner, "connected",
+                              display_name=name, detail=None)
+        db.close()
+        self._append_event(
+            "connector",
+            f"{self.PORTAL_NAMES[portal]} connected — CMM Scout "
+            f"confirmed it from your own browser: signed in as "
+            f"{name}. No agent involved; CMM stored no password.")
+        return True, "connected"
+
+    def scout_zip(self):
+        """The CMM Scout helper as a downloadable zip (built on the
+        fly from the repo's extension/ folder, stdlib zipfile)."""
+        import io
+        import zipfile
+        root = os.path.dirname(
+            os.path.dirname(os.path.abspath(__file__)))
+        ext_dir = os.path.join(root, "extension")
+        if not os.path.isdir(ext_dir):
+            return None
+        buf = io.BytesIO()
+        with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as z:
+            for dirpath, _dirs, files in os.walk(ext_dir):
+                for fn in sorted(files):
+                    full = os.path.join(dirpath, fn)
+                    arc = os.path.join(
+                        "cmm-scout",
+                        os.path.relpath(full, ext_dir))
+                    z.write(full, arc)
+        return buf.getvalue()
 
     def request_apply(self, posting_id):
         """The website's Apply button: queue a prepared pursuit for the
@@ -1092,6 +1181,7 @@ class UI:
             "counts": counts, "range": range_key,
             "range_label": RANGE_LABELS[range_key],
             "connections": connections,
+            "scout": self.scout_state(),
             "matches": matches, "events": merged,
             "feed": human_feed(merged),
             "intake": intake,
@@ -1436,7 +1526,7 @@ details.rawlog{margin-top:4px}details.rawlog summary{cursor:pointer;color:var(--
      <div class="fld"><label>Search phrases <span class="hint">comma-separated</span></label><input type="text" id="sKeywords"></div>
      <div class="fld"><label>Match skills <span class="hint">comma-separated — a role stays in only if it asks for ≥2 of these</span></label><input type="text" id="sMatch"></div>
      <div class="fld"><label>Look on</label><div class="srcs" id="sSources"></div></div>
-     <div class="fld" style="grid-column:1/-1"><label>Your accounts <span class="hint">press Connect and the portal's own sign-in page opens in a new tab — you sign in there yourself; CMM never sees or stores your password</span></label><div id="connList"></div></div>
+     <div class="fld" style="grid-column:1/-1"><label>Your accounts <span class="hint">press Connect and the portal's own sign-in page opens in a new tab — you sign in there yourself; CMM never sees or stores your password</span></label><div id="connList"></div><div id="scoutBox" style="margin-top:10px"></div></div>
      <div class="fld"><label>Job type</label><div class="srcs"><label style="font-weight:400"><input type="checkbox" class="sjt" value="contract"> Contract</label><label style="font-weight:400"><input type="checkbox" class="sjt" value="full_time"> Full-time</label><label style="font-weight:400"><input type="checkbox" class="sjt" value="part_time"> Part-time</label></div><span class="hint">none ticked = any type</span></div>
      <div class="fld"><label>Workplace</label><div class="srcs"><label style="font-weight:400"><input type="checkbox" class="swp" value="remote"> Remote</label><label style="font-weight:400"><input type="checkbox" class="swp" value="hybrid"> Hybrid</label><label style="font-weight:400"><input type="checkbox" class="swp" value="onsite"> On-site</label></div><span class="hint">none ticked = anywhere · posted in the last</span> <select id="sHours"><option value="12">12h</option><option value="24">24h</option><option value="48">48h</option><option value="72">3 days</option><option value="168">7 days</option></select></div>
     </div>
@@ -1718,13 +1808,35 @@ function renderConnections(){
   const c=conns[p]||{status:'not_connected'};
   let pill,btn;
   if(c.status==='connected'){pill='<span style="color:#0E7A4F;font-weight:700">✓ Connected as '+esc(c.display_name||'')+'</span>';btn='<button class="btn2" data-disconnect="'+p+'" type="button">Disconnect</button>';}
-  else if(c.status==='connecting'){pill='<span style="color:#9A6A00;font-weight:700">⏳ Connecting… '+names[p]+'’s sign-in page is open in a new tab — sign in there; this flips to ✓ Connected once you’re in (a minute or two)</span>';btn='';}
+  else if(c.status==='connecting'){pill='<span style="color:#9A6A00;font-weight:700">⏳ Connecting… '+names[p]+'’s sign-in page is open in a new tab — sign in there; this flips to ✓ Connected once you’re in'+(c.detail==='own_browser'?' — CMM Scout confirms it from your own browser':' (a minute or two)')+'</span>';btn='<button class="btn2" data-disconnect="'+p+'" type="button">Cancel</button>';}
   else if(c.status==='failed'){pill='<span style="color:#B3261E;font-weight:700">Couldn’t connect'+(c.detail?' — '+esc(c.detail):'')+'</span>';btn='<button class="btn2" data-connect="'+p+'" type="button">Try again</button>';}
   else{pill='<span style="color:#5A6B62">Not connected</span>';btn='<button class="btn2" data-connect="'+p+'" type="button">Connect '+names[p]+'</button>';}
   return '<div style="display:flex;gap:10px;align-items:center;padding:7px 0;border-bottom:1px solid #EEF4F0"><b style="min-width:70px">'+names[p]+'</b>'+pill+'<span style="flex:1"></span>'+btn+'</div>';
  }).join('');
  document.querySelectorAll('[data-connect]').forEach(b=>b.onclick=()=>portalConn('api/connect',b.dataset.connect));
  document.querySelectorAll('[data-disconnect]').forEach(b=>b.onclick=()=>portalConn('api/disconnect',b.dataset.disconnect));
+ renderScout();
+}
+function renderScout(){
+ if(!S)return;
+ const box=document.getElementById('scoutBox');if(!box)return;
+ const sc=S.scout||{};
+ if(!sc.paired){
+  box.innerHTML='<div style="border:1px dashed #BFD8CC;border-radius:8px;padding:10px 12px">'
+   +'<b>🦉 CMM Scout — make CMM independent of any agent</b><br>'
+   +'<span style="color:#5A6B62">Pair the small CMM Scout helper in <b>your own browser</b>: from then on, Connect confirms inside your browser, from the name the portal shows <b>you</b> — no agent, no saved login anywhere else. Your password never leaves the portal’s own page.</span><br>'
+   +'<button class="btn2" id="scoutGen" type="button" style="margin-top:8px">Get my pairing code</button> '
+   +'<a class="btn2" href="scout.zip" style="display:inline-block;margin-top:8px;text-decoration:none">⬇ Download CMM Scout</a></div>';
+  const g=document.getElementById('scoutGen');if(g)g.onclick=async()=>{try{await fetch('api/scout-code',{method:'POST',headers:{'Content-Type':'application/json'},body:'{}'});}catch(e){}_lastSig='';load();};
+ }else{
+  box.innerHTML='<div style="border:1px solid #BFD8CC;border-radius:8px;padding:10px 12px;background:#F4FAF6">'
+   +'<b>🦉 CMM Scout — paired ✓</b> <span style="color:#5A6B62">Connect now confirms in your own browser; no agent is involved.</span><br>'
+   +'<span style="color:#5A6B62">Your pairing code (paste it into the Scout helper once):</span> '
+   +'<code style="font-size:16px;font-weight:700;letter-spacing:2px;background:#fff;border:1px solid #BFD8CC;border-radius:6px;padding:2px 8px">'+esc(sc.code||'')+'</code><br>'
+   +'<span style="color:#5A6B62">Steps: <a href="scout.zip">download CMM Scout</a>, unzip it, open <b>chrome://extensions</b>, turn on <b>Developer mode</b>, <b>Load unpacked</b> the folder, click the Scout icon and paste the code.</span> '
+   +'<button class="btn2" id="scoutGen" type="button">New code</button></div>';
+  const g=document.getElementById('scoutGen');if(g)g.onclick=async()=>{try{await fetch('api/scout-code',{method:'POST',headers:{'Content-Type':'application/json'},body:'{}'});}catch(e){}_lastSig='';load();};
+ }
 }
 async function portalConn(path,portal){
  if(path==='api/connect'){
@@ -1817,6 +1929,18 @@ def make_handler(ui):
             elif parsed.path == "/api/state":
                 qs = parse_qs(parsed.query)
                 self._json(ui.state(qs.get("range", ["all"])[0]))
+            elif parsed.path == "/scout.zip":
+                data = ui.scout_zip()
+                if data is None:
+                    self._json({"error": "not found"}, 404)
+                    return
+                self.send_response(200)
+                self.send_header("Content-Type", "application/zip")
+                self.send_header("Content-Disposition",
+                                 'attachment; filename="cmm-scout.zip"')
+                self.send_header("Content-Length", str(len(data)))
+                self.end_headers()
+                self.wfile.write(data)
             elif parsed.path == "/api/download":
                 qs = parse_qs(parsed.query)
                 try:
@@ -1885,6 +2009,25 @@ def make_handler(ui):
                     ok, info = ui.disconnect_portal(portal)
                 self._json({"started": ok, "status": info} if ok
                            else {"started": False, "error": info},
+                           200 if ok else 400)
+            elif self.path == "/api/scout-code":
+                ok, info = ui.generate_scout_code()
+                self._json({"started": ok, "code": info} if ok
+                           else {"started": False, "error": info},
+                           200 if ok else 400)
+            elif self.path == "/api/connect-confirm":
+                try:
+                    length = int(self.headers.get("Content-Length") or 0)
+                    payload = json.loads(self.rfile.read(length) or b"{}")
+                except (ValueError, json.JSONDecodeError):
+                    self._json({"ok": False, "error": "Bad request."}, 400)
+                    return
+                ok, info = ui.confirm_connection(
+                    str(payload.get("portal") or ""),
+                    str(payload.get("code") or ""),
+                    str(payload.get("display_name") or ""))
+                self._json({"ok": ok, "status": info} if ok
+                           else {"ok": False, "error": info},
                            200 if ok else 400)
             elif self.path == "/api/stop":
                 try:

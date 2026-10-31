@@ -89,6 +89,14 @@ CREATE TABLE IF NOT EXISTS portal_connections (
     updated_at TEXT NOT NULL,
     PRIMARY KEY (portal, candidate)
 );
+CREATE TABLE IF NOT EXISTS scout_pairings (
+    candidate TEXT PRIMARY KEY,
+    code TEXT NOT NULL,              -- pairing code for the CMM Scout
+                                     -- browser helper; proves the browser
+                                     -- belongs to this candidate. NOT a
+                                     -- portal credential.
+    created_at TEXT NOT NULL
+);
 """
 
 
@@ -265,6 +273,41 @@ def connections_for(db, candidate):
                 "connected_at": row["connected_at"],
             }
     return out
+
+
+def get_scout_code(db, candidate):
+    """The candidate's CMM Scout pairing code, or None (missing-table
+    safe for pre-Scout stores)."""
+    try:
+        row = db.execute(
+            "SELECT code FROM scout_pairings WHERE candidate=?",
+            (candidate,)).fetchone()
+    except Exception:
+        return None
+    return row["code"] if row else None
+
+
+def candidate_for_scout_code(db, code):
+    """Which candidate a pairing code belongs to, or None."""
+    if not code:
+        return None
+    try:
+        row = db.execute(
+            "SELECT candidate FROM scout_pairings WHERE code=?",
+            (code,)).fetchone()
+    except Exception:
+        return None
+    return row["candidate"] if row else None
+
+
+def set_scout_code(db, candidate, code):
+    db.execute(
+        "INSERT INTO scout_pairings (candidate, code, created_at)"
+        " VALUES (?, ?, ?)"
+        " ON CONFLICT(candidate) DO UPDATE SET code=excluded.code,"
+        " created_at=excluded.created_at",
+        (candidate, code, now_iso()))
+    db.commit()
 
 
 def set_connection(db, portal, candidate, status, display_name=None,

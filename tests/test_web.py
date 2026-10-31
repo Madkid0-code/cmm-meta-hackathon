@@ -514,6 +514,44 @@ class TestServer(unittest.TestCase):
         ok, _ = self.ui.connect_portal("myspace")
         self.assertFalse(ok)  # unknown portal refused
 
+    def test_scout_pairing_and_own_browser_confirm(self):
+        # Unpaired: state says so, and a confirm with any code fails.
+        st = self.ui.state()
+        self.assertFalse(st["scout"]["paired"])
+        ok, _ = self.ui.confirm_connection("dice", "WHATEVER", "Some One")
+        self.assertFalse(ok)
+        # Pair: a code is generated and served back in state.
+        ok, code = self.ui.generate_scout_code()
+        self.assertTrue(ok)
+        self.assertEqual(len(code), 8)
+        st = self.ui.state()
+        self.assertTrue(st["scout"]["paired"])
+        self.assertEqual(st["scout"]["code"], code)
+        # With a pairing in place, Connect is an own-browser request:
+        # the executor must skip it (detail marker), no agent confirm.
+        ok, _ = self.ui.connect_portal("linkedin")
+        self.assertTrue(ok)
+        st = self.ui.state()
+        self.assertEqual(st["connections"]["linkedin"]["status"],
+                         "connecting")
+        self.assertEqual(st["connections"]["linkedin"]["detail"],
+                         "own_browser")
+        # Wrong code cannot confirm; the right code can, and the card
+        # takes the name the portal showed in the seeker's browser.
+        ok, _ = self.ui.confirm_connection("linkedin", "WRONGCODE",
+                                           "Some One")
+        self.assertFalse(ok)
+        ok, _ = self.ui.confirm_connection("linkedin", code,
+                                           "  Some   One ")
+        self.assertTrue(ok)
+        st = self.ui.state()
+        self.assertEqual(st["connections"]["linkedin"]["status"],
+                         "connected")
+        self.assertEqual(st["connections"]["linkedin"]["display_name"],
+                         "Some One")
+        # The Scout zip download is buildable.
+        self.assertTrue(self.ui.scout_zip())
+
     def test_apply_blocked_until_portal_connected(self):
         import sqlite3 as _sq
         db = _sq.connect(os.path.join(self.out, "attested.db"))

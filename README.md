@@ -149,6 +149,20 @@ shared with or stored by CMM. (For the done-for-you service model, the
 same scout runs in a per-candidate isolated browser profile; profiles
 never mix.)
 
+**Portal connections, independently confirmed (built Oct 31).** The
+"Your accounts" Connect buttons follow the same rule. Pressing Connect
+opens the portal's own sign-in page in a new tab in the seeker's
+browser; the seeker signs in there themselves. With the **CMM Scout**
+helper paired (a one-time code, issued in Your accounts; source in
+`extension/`, downloadable from the site as `scout.zip`), the helper
+reads the account name the portal displays *in that browser* and posts
+it to `/api/connect-confirm` — the card flips to "✓ Connected as
+\<name\>" with **no agent and no saved login anywhere near it**. The
+pairing code is the only credential, and it identifies the browser,
+never a portal account. Without Scout paired, a Muse browser agent
+performs the same confirmation in the seeker's signed-in session —
+the fallback, not the design.
+
 ## Why it is built this way
 
 An LLM that grades its own honesty will eventually invent a skill. So the
