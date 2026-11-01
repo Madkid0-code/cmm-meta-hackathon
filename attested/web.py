@@ -379,11 +379,18 @@ KNOWN_SOURCES = ("dice", "linkedin")
 
 
 class UI:
-    def __init__(self, out_dir, form_path, demo_dir, fixture_out):
+    def __init__(self, out_dir, form_path, demo_dir, fixture_out,
+                 sandbox=False):
         self.out_dir = out_dir
         self.form_path = form_path
         self.demo_dir = demo_dir
         self.fixture_out = fixture_out
+        # Sandbox mode = the judge demo link: Connect lands Connected in
+        # one click under the name typed into the form, no credentials
+        # are asked, seen, or stored, and the page says so (banner +
+        # disclaimer, Scout box hidden). Off by default — a normal
+        # instance behaves exactly as before.
+        self.sandbox = bool(sandbox)
         self._home_out = out_dir
         self._home_form = form_path
         self._rides_root = os.path.join(
@@ -493,11 +500,29 @@ class UI:
             return False, "Unknown portal."
         db, candidate = self._connections_db()
         from attested import store as _store
+        name = self.PORTAL_NAMES[portal]
+        if self.sandbox:
+            # Judge demo link: Connect is one click and lands Connected
+            # instantly, under the name the judge typed into the form.
+            # No credentials are asked, seen, or stored, and no
+            # 'connecting' state persists for any executor to pick up —
+            # the disclaimer on the page states exactly this.
+            _store.set_connection(
+                db, portal, candidate, "connected",
+                display_name=candidate,
+                detail="demo sandbox — one-click connect")
+            db.close()
+            self._append_event(
+                "connector",
+                f"Connect {name} pressed — judge demo link: connected "
+                f"instantly as {candidate}. No credentials were asked "
+                "or stored; in the real product CMM Scout confirms "
+                "the connection inside your own browser.")
+            return True, "connected"
         own_browser = _store.get_scout_code(db, candidate) is not None
         _store.set_connection(db, portal, candidate, "connecting",
                               detail="own_browser" if own_browser else None)
         db.close()
-        name = self.PORTAL_NAMES[portal]
         if own_browser:
             self._append_event(
                 "connector",
@@ -1164,7 +1189,7 @@ class UI:
                     seen.add(m.group(2))
                     intake.append({"type": m.group(1), "term": m.group(2),
                                    "message": e["message"]})
-        return {
+        result = {
             "candidate": form["name"],
             "skills": form["attested_skills"],
             "boundaries": form.get("hard_boundaries", []),
@@ -1191,6 +1216,64 @@ class UI:
             "mode": "ride" if self._ride_active else "demo",
             "prefill_form": profile.load_form(self._home_form),
         }
+        if self.sandbox:
+            # Only the judge demo link advertises sandbox mode; a normal
+            # instance's state payload is unchanged.
+            result["sandbox"] = True
+        return result
+
+    # -- served page ---------------------------------------------------
+    def page(self):
+        """The Mission Control page. In normal mode this is PAGE itself,
+        byte-for-byte. In sandbox mode (the judge demo link) the same
+        page is adjusted in exactly four places: a judge banner across
+        the top, an accounts hint that makes no sign-in-tab claim, the
+        CMM Scout box hidden, no portal tab opened by the Connect
+        click, and the demo-vs-real disclaimer directly under the
+        accounts panel."""
+        if not self.sandbox:
+            return PAGE
+        html = PAGE
+        banner = (
+            '<div style="background:#FFF7E0;border-bottom:2px solid '
+            '#E8C96A;color:#6B5200;padding:12px 20px;font-size:15px;'
+            'text-align:center"><b>⚖️ Judge demo</b> — enter your name '
+            'in <b>Your profile</b>: that is your sign-in on this link, '
+            'no password needed.</div>\n')
+        html = html.replace('<div class="layout">',
+                            banner + '<div class="layout">', 1)
+        html = html.replace(
+            "press Connect and the portal's own sign-in page opens in "
+            "a new tab — you sign in there yourself; CMM never sees or "
+            "stores your password",
+            "press Connect — on this judge demo link you are connected "
+            "instantly, and no credentials are asked (see the note "
+            "below)", 1)
+        html = html.replace(
+            '<div id="scoutBox" style="margin-top:10px"></div>',
+            '<div id="scoutBox" style="display:none"></div>', 1)
+        disclaimer = (
+            '</div>\n'
+            '     <p style="grid-column:1/-1;background:#FFF7E0;'
+            'border:1px solid #E8C96A;border-radius:12px;'
+            'padding:10px 14px;color:#6B5200;font-size:13.5px;'
+            'margin:0">Demo link: Connect here is one click and asks '
+            'for no credentials, so you can evaluate CMM safely. In '
+            'the real product, you sign in on LinkedIn&rsquo;s or '
+            'Dice&rsquo;s own page yourself, and only with the help '
+            'of CMM Scout do you get connected to CMM. We never ask '
+            'for your password, and we never store your password or '
+            'cookies.</p>')
+        html = html.replace(
+            '<div id="scoutBox" style="display:none"></div></div>',
+            '<div id="scoutBox" style="display:none"></div>'
+            + disclaimer, 1)
+        html = html.replace(
+            "if(loginUrls[portal])window.open(loginUrls[portal],"
+            "'_blank');",
+            "if(!(S&&S.sandbox)&&loginUrls[portal])"
+            "window.open(loginUrls[portal],'_blank');", 1)
+        return html
 
     def doc_html(self, posting_id, kind):
         if kind == "jd":
@@ -1920,7 +2003,7 @@ def make_handler(ui):
         def do_GET(self):
             parsed = urlparse(self.path)
             if parsed.path == "/":
-                body = PAGE.encode()
+                body = ui.page().encode()
                 self.send_response(200)
                 self.send_header("Content-Type", "text/html; charset=utf-8")
                 self.send_header("Content-Length", str(len(body)))
@@ -2095,8 +2178,9 @@ def make_handler(ui):
     return Handler
 
 
-def serve(out_dir, form_path, demo_dir, fixture_out, port=8765):
-    ui = UI(out_dir, form_path, demo_dir, fixture_out)
+def serve(out_dir, form_path, demo_dir, fixture_out, port=8765,
+          sandbox=False):
+    ui = UI(out_dir, form_path, demo_dir, fixture_out, sandbox=sandbox)
     server = ThreadingHTTPServer(("127.0.0.1", port), make_handler(ui))
     print(f"CMM Mission Control: http://127.0.0.1:{port}")
     server.serve_forever()

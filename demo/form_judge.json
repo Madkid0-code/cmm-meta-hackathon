@@ -1,0 +1,81 @@
+{
+ "name": "Guest",
+ "attested_skills": [
+  {
+   "term": "Python",
+   "evidence": "9 years across all roles; primary language for pipelines and tooling"
+  },
+  {
+   "term": "SQL",
+   "evidence": "9 years; complex window functions, query tuning on warehouse and lake"
+  },
+  {
+   "term": "PySpark",
+   "evidence": "6 years building batch pipelines on Amazon EMR"
+  },
+  {
+   "term": "Amazon EMR",
+   "evidence": "6 years operating Spark clusters for nightly and hourly loads"
+  },
+  {
+   "term": "AWS Glue Catalog",
+   "evidence": "5 years as the metastore for EMR Spark jobs"
+  },
+  {
+   "term": "Amazon S3",
+   "evidence": "7 years of data lake storage design and partitioning"
+  },
+  {
+   "term": "Delta Lake",
+   "evidence": "4 years of ACID table management on the lake"
+  },
+  {
+   "term": "Apache Airflow",
+   "evidence": "5 years authoring and operating production DAGs"
+  },
+  {
+   "term": "Snowflake",
+   "evidence": "3 years as the analytics warehouse; wrote SQL models and SnowSQL jobs loaded from the lake"
+  },
+  {
+   "term": "dbt",
+   "evidence": "2 years of transformation models on the Snowflake warehouse"
+  }
+ ],
+ "hard_boundaries": [
+  "Never used Snowpark \u2014 Snowflake work was SQL and SnowSQL, not the DataFrame API.",
+  "Never used Kafka or any streaming platform \u2014 all pipelines are batch.",
+  "Never used Terraform \u2014 infrastructure was provisioned by a platform team."
+ ],
+ "search": {
+  "keywords": [
+   "data engineer pyspark",
+   "data engineer python sql"
+  ],
+  "match_skills": [
+   "python",
+   "sql",
+   "pyspark",
+   "tableau",
+   "power bi"
+  ],
+  "location": "United States",
+  "job_types": [
+   "contract",
+   "full_time"
+  ],
+  "workplace": [
+   "remote",
+   "hybrid",
+   "onsite"
+  ],
+  "contract_only": false,
+  "posted_within_hours": 24,
+  "sources": [
+   "dice",
+   "linkedin"
+  ]
+ },
+ "note": "FICTIONAL demo persona. Every fact below is invented for the demo.",
+ "raw_resume_file": "uploaded_resume.md"
+}

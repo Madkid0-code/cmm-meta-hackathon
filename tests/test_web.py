@@ -552,6 +552,46 @@ class TestServer(unittest.TestCase):
         # The Scout zip download is buildable.
         self.assertTrue(self.ui.scout_zip())
 
+    def test_sandbox_connect_instant_and_judge_framed_page(self):
+        # Judge demo link (sandbox mode): Connect lands Connected in
+        # one click, under the name in the form, marked as the demo
+        # sandbox — no 'connecting' state ever persists for an
+        # executor, and no credentials are involved.
+        sb = web.UI(self.out, self.form_path, self.tmp, self.tmp,
+                    sandbox=True)
+        st = sb.state()
+        self.assertTrue(st["sandbox"])
+        self.assertNotIn("sandbox", self.ui.state())
+        ok, info = sb.connect_portal("dice")
+        self.assertTrue(ok, info)
+        self.assertEqual(info, "connected")
+        st = sb.state()
+        self.assertEqual(st["connections"]["dice"]["status"], "connected")
+        self.assertEqual(st["connections"]["dice"]["display_name"],
+                         "Test Person")
+        self.assertEqual(st["connections"]["dice"]["detail"],
+                         "demo sandbox — one-click connect")
+        self.assertIsNotNone(st["connections"]["dice"]["connected_at"])
+        # Disconnect behaves exactly as in normal mode.
+        ok, _ = sb.disconnect_portal("dice")
+        self.assertTrue(ok)
+        self.assertEqual(sb.state()["connections"]["dice"]["status"],
+                         "not_connected")
+        # The served page is judge-framed only in sandbox mode: banner,
+        # hidden Scout box, disclaimer under the accounts panel, no
+        # sign-in-tab claim, and no portal tab opened on Connect.
+        page = sb.page()
+        self.assertIn("Judge demo", page)
+        self.assertIn("no password needed", page)
+        self.assertIn("Demo link: Connect here is one click", page)
+        self.assertIn("never store your password or cookies", page)
+        self.assertIn('id="scoutBox" style="display:none"', page)
+        self.assertNotIn("sign-in page opens in a new tab", page)
+        self.assertIn("!(S&&S.sandbox)&&loginUrls[portal]", page)
+        # Normal mode serves PAGE itself, untouched.
+        self.assertEqual(self.ui.page(), web.PAGE)
+        self.assertNotIn("Judge demo", self.ui.page())
+
     def test_apply_blocked_until_portal_connected(self):
         import sqlite3 as _sq
         db = _sq.connect(os.path.join(self.out, "attested.db"))
