@@ -592,6 +592,50 @@ class TestServer(unittest.TestCase):
         self.assertEqual(self.ui.page(), web.PAGE)
         self.assertNotIn("Judge demo", self.ui.page())
 
+    def test_sandbox_apply_completes_instantly_in_demo_mode(self):
+        # Judge demo link (sandbox mode): Apply lands 'applied' at
+        # once with Dice's success line + the plain demo note as the
+        # outcome — no 'apply_requested' state ever persists for an
+        # executor, and no real application is sent. Normal mode is
+        # untouched: it still queues for the real applier.
+        import sqlite3 as _sq
+        sb = web.UI(self.out, self.form_path, self.tmp, self.tmp,
+                    sandbox=True)
+        db = _sq.connect(os.path.join(self.out, "attested.db"))
+        db.execute("UPDATE pursuits SET status='prepared', detail=NULL")
+        db.commit()
+        pid = db.execute(
+            "SELECT posting_id FROM pursuits LIMIT 1").fetchone()[0]
+        db.close()
+        ok, info = sb.connect_portal("dice")
+        self.assertTrue(ok, info)
+        ok, info = sb.request_apply(pid)
+        self.assertTrue(ok, info)
+        self.assertEqual(info, "applied")
+        db = _sq.connect(os.path.join(self.out, "attested.db"))
+        status, detail = db.execute(
+            "SELECT status, detail FROM pursuits").fetchone()
+        db.close()
+        self.assertEqual(status, "applied")
+        self.assertIn("Fantastic! Your application is on its way!",
+                      detail)
+        self.assertIn("no real application was sent", detail)
+        self.assertIn("never sees or stores your password", detail)
+        self.assertIn("confirmation to your own email address", detail)
+        # The board state carries the demo outcome for the judge.
+        m = sb.state()["matches"][0]
+        self.assertEqual(m["pursuit_status"], "applied")
+        self.assertEqual(m["pursuit_detail"], detail)
+        # The same store through a normal instance never demo-applies:
+        # a fresh prepared pursuit queues as apply_requested.
+        db = _sq.connect(os.path.join(self.out, "attested.db"))
+        db.execute("UPDATE pursuits SET status='prepared', detail=NULL")
+        db.commit()
+        db.close()
+        ok, info = self.ui.request_apply(pid)
+        self.assertTrue(ok, info)
+        self.assertEqual(info, "apply_requested")
+
     def test_apply_blocked_until_portal_connected(self):
         import sqlite3 as _sq
         db = _sq.connect(os.path.join(self.out, "attested.db"))

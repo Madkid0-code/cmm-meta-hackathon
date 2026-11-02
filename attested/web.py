@@ -481,6 +481,20 @@ class UI:
     # -- portal connections ------------------------------------------
     PORTAL_NAMES = {"dice": "Dice", "linkedin": "LinkedIn"}
 
+    # Judge demo link (sandbox mode) only: Apply completes instantly
+    # in demo mode — no real application is sent and no executor ever
+    # runs for the sandbox store. The outcome shows Dice's own success
+    # line, with the plain demo note directly under it.
+    DEMO_APPLY_CONFIRMATION = (
+        "Fantastic! Your application is on its way! 🥳")
+    DEMO_APPLY_NOTE = (
+        "This is a demo session, so no real application was sent. "
+        "On the real CMM website, CMM applies using your own Dice "
+        "or LinkedIn — you sign in on the portal's own page, CMM "
+        "never sees or stores your password — and you can verify "
+        "it yourself: Dice sends the application confirmation to "
+        "your own email address.")
+
     def _connections_db(self):
         """(db, candidate) for the connections table, or (None, name)."""
         from attested import store as _store
@@ -685,6 +699,31 @@ class UI:
                     f"Connect {pname} first — this application is "
                     f"submitted inside your signed-in {pname} session. "
                     f"You'll find Connect {pname} in Your search.")
+        if self.sandbox:
+            # Judge demo link: Apply completes instantly in demo mode.
+            # No real application is sent, no 'apply_requested' state
+            # ever persists for an executor to pick up, and the outcome
+            # carries Dice's success line plus the plain demo note.
+            # This branch exists ONLY in sandbox mode — a normal
+            # instance queues for the real applier exactly as before.
+            detail = (self.DEMO_APPLY_CONFIRMATION + " "
+                      + self.DEMO_APPLY_NOTE)
+            db.execute("UPDATE pursuits SET status = 'applied', "
+                       "detail = ?, updated_at = ? WHERE id = ?",
+                       (detail,
+                        datetime.now(timezone.utc).isoformat(
+                            timespec="seconds"),
+                        row[0]))
+            db.commit()
+            db.close()
+            self._append_event(
+                "applier",
+                "Apply pressed on the website — judge demo link: "
+                "application completed in demo mode. No real "
+                "application was sent; in the real product CMM "
+                "applies inside your own signed-in portal session "
+                "and the portal emails you the confirmation.")
+            return True, "applied"
         db.execute("UPDATE pursuits SET status = 'apply_requested', "
                    "updated_at = ? WHERE id = ?",
                    (datetime.now(timezone.utc).isoformat(timespec="seconds"),
