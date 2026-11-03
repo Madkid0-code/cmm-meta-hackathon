@@ -391,6 +391,23 @@ class UI:
         # disclaimer, Scout box hidden). Off by default — a normal
         # instance behaves exactly as before.
         self.sandbox = bool(sandbox)
+        # Sandbox (judge demo link) only: the shipped form file is the
+        # pristine starting form and is never edited — the account's
+        # live form is a working copy inside the store, seeded from the
+        # shipped file (with the resume file it names), so the sandbox
+        # full reset can restore the exact starting state. A normal
+        # instance edits its own form file in place, as before.
+        self._shipped_form = form_path
+        if self.sandbox:
+            live = os.path.join(out_dir, "form.json")
+            if os.path.abspath(live) != os.path.abspath(form_path):
+                if not os.path.exists(live):
+                    import shutil
+                    os.makedirs(out_dir, exist_ok=True)
+                    shutil.copyfile(form_path, live)
+                    self._copy_form_resume(form_path, live)
+                form_path = live
+                self.form_path = live
         self._home_out = out_dir
         self._home_form = form_path
         self._rides_root = os.path.join(
@@ -401,6 +418,28 @@ class UI:
         self._stop_req = {"sweep": False, "fixture": False}
         self._stop_mode = "keep"
         self._run_ctx = {}
+
+    @staticmethod
+    def _copy_form_resume(src_form, dst_form):
+        """Copy the raw resume a form names from beside the source form
+        to beside the destination form (the intake audit resolves it
+        relative to the form file). A missing file is fine — the audit
+        is skipped when no resume is there."""
+        try:
+            with open(src_form) as f:
+                raw_name = json.load(f).get("raw_resume_file")
+        except Exception:
+            return
+        if not raw_name:
+            return
+        import shutil
+        src = os.path.join(os.path.dirname(os.path.abspath(src_form)),
+                           raw_name)
+        dst = os.path.join(os.path.dirname(os.path.abspath(dst_form)),
+                           raw_name)
+        if (os.path.exists(src)
+                and os.path.abspath(src) != os.path.abspath(dst)):
+            shutil.copyfile(src, dst)
 
     # -- runs ------------------------------------------------------
     def readonly(self):
@@ -986,7 +1025,16 @@ class UI:
         the call queue — so a fresh run (or a demo take) starts from a
         truly blank board. The PERSON stays: form, attested profile and
         the scout's inbox deposits are the account, not the run.
-        Home store only; never during a run."""
+        Home store only; never during a run.
+
+        Sandbox (judge demo link) exception (owner, 2026-11-03 —
+        'when I click reset everything should get reset: your profile,
+        search criteria, everything'): on the judge link reset means
+        EVERYTHING — the run above, plus the portal connections wiped
+        back to not-connected, plus the live form (profile + search)
+        restored from the shipped starting form — so every judge
+        starts from the exact same clean slate. Normal instances keep
+        the account exactly as before."""
         if self.readonly():
             return False, "View-only preview — reset is disabled."
         if os.path.abspath(self.form_path) != os.path.abspath(self._home_form):
@@ -994,12 +1042,17 @@ class UI:
         if any(self._running.values()):
             return False, ("A run is in progress — let it finish (or stop "
                            "it) before resetting.")
+        tables = ["pursuits", "candidate_resumes", "candidate_matches",
+                  "job_postings", "job_posting_raw", "sweep_configs"]
+        if self.sandbox:
+            tables += ["portal_connections", "scout_pairings"]
         db = store.connect(os.path.join(self.out_dir, "attested.db"))
         try:
-            for table in ("pursuits", "candidate_resumes",
-                          "candidate_matches", "job_postings",
-                          "job_posting_raw", "sweep_configs"):
-                db.execute(f"DELETE FROM {table}")
+            for table in tables:
+                try:
+                    db.execute(f"DELETE FROM {table}")
+                except sqlite3.Error:
+                    pass  # a store predating the table: nothing to wipe
             db.commit()
         finally:
             db.close()
@@ -1011,8 +1064,16 @@ class UI:
             path = os.path.join(self.out_dir, name)
             if os.path.exists(path):
                 os.remove(path)
-        self._append_event("system", "Demo reset — the board is empty. "
-                                     "A fresh run starts from nothing.")
+        if self.sandbox:
+            shutil.copyfile(self._shipped_form, self.form_path)
+            self._copy_form_resume(self._shipped_form, self.form_path)
+            self._append_event(
+                "system", "Demo reset — everything is back to the "
+                          "starting state: board empty, profile and "
+                          "search restored, portals not connected.")
+        else:
+            self._append_event("system", "Demo reset — the board is empty. "
+                                         "A fresh run starts from nothing.")
         return True, "reset"
 
     # -- the ride: a visitor's own form -> their own store -> full flow --
@@ -1265,14 +1326,19 @@ class UI:
     def page(self):
         """The Mission Control page. In normal mode this is PAGE itself,
         byte-for-byte. In sandbox mode (the judge demo link) the same
-        page is adjusted in exactly four places: a judge banner across
+        page is adjusted in exactly these places: a judge banner across
         the top, an accounts hint that makes no sign-in-tab claim, the
         CMM Scout box hidden, no portal tab opened by the Connect
-        click, and the demo-vs-real disclaimer directly under the
-        accounts panel."""
+        click, the demo-vs-real disclaimer directly under the
+        accounts panel, and a reset warning that tells the truth about
+        the sandbox full reset."""
         if not self.sandbox:
             return PAGE
         html = PAGE
+        html = html.replace(
+            "Your profile and your search stay exactly as they are.",
+            "Your profile, your search and your portal connections "
+            "also reset to the starting state.", 1)
         banner = (
             '<div style="background:#FFF7E0;border-bottom:2px solid '
             '#E8C96A;color:#6B5200;padding:12px 20px;font-size:15px;'

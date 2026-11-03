@@ -728,6 +728,65 @@ class TestServer(unittest.TestCase):
         self.assertTrue(any("Demo reset" in s["text"] or
                             "Demo reset" in s["title"] for s in feed))
 
+    def test_sandbox_reset_restores_starting_state(self):
+        # Judge demo link (owner, 2026-11-03): reset means EVERYTHING —
+        # run wiped, profile + search restored to the shipped starting
+        # form, portals back to not-connected. The live form is a
+        # working copy inside the store; the shipped file never moves.
+        sb = web.UI(self.out, self.form_path, self.tmp, self.tmp,
+                    sandbox=True)
+        live_form = os.path.join(self.out, "form.json")
+        self.assertTrue(os.path.exists(live_form))
+        # The judge personalises the profile + search and connects.
+        form = json.load(open(live_form))
+        form["name"] = "Judge Judy"
+        form["search"]["keywords"] = ["something else"]
+        with open(live_form, "w") as f:
+            json.dump(form, f)
+        ok, info = sb.connect_portal("dice")
+        self.assertTrue(ok, info)
+        self.assertEqual(sb.state()["connections"]["dice"]["status"],
+                         "connected")
+        self.assertEqual(sb.state()["candidate"], "Judge Judy")
+        ok, info = sb.reset_demo()
+        self.assertTrue(ok, info)
+        st = sb.state("all")
+        self.assertEqual(st["candidate"], "Test Person")
+        self.assertEqual(st["connections"]["dice"]["status"],
+                         "not_connected")
+        self.assertEqual(st["connections"]["linkedin"]["status"],
+                         "not_connected")
+        for key in ("raw", "postings", "judged", "pass", "resumes",
+                    "pursuits", "applied"):
+            self.assertEqual(st["counts"][key], 0, key)
+        restored = json.load(open(live_form))
+        self.assertEqual(restored["name"], "Test Person")
+        self.assertEqual(restored["search"]["keywords"],
+                         ["data engineer"])
+        # The shipped starting form was never edited.
+        shipped = json.load(open(self.form_path))
+        self.assertEqual(shipped["name"], "Test Person")
+        self.assertEqual(shipped["search"]["keywords"],
+                         ["data engineer"])
+        # The sandbox page's reset warning tells the truth.
+        self.assertIn("also reset to the starting state", sb.page())
+        self.assertNotIn("also reset to the starting state",
+                         self.ui.page())
+
+    def test_reset_keeps_connections_in_normal_mode(self):
+        # Normal mode is untouched by the sandbox full reset: the
+        # account's portal connections survive a run-only reset.
+        db = store.connect(os.path.join(self.out, "attested.db"))
+        store.set_connection(db, "dice", "Test Person", "connected",
+                             display_name="Test Person")
+        db.close()
+        self.assertEqual(self.ui.state()["connections"]["dice"]["status"],
+                         "connected")
+        ok, info = self.ui.reset_demo()
+        self.assertTrue(ok, info)
+        self.assertEqual(self.ui.state()["connections"]["dice"]["status"],
+                         "connected")
+
     def test_page_has_upload_and_reset_controls(self):
         status, body = self._get("/")
         self.assertEqual(status, 200)

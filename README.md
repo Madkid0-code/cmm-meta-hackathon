@@ -238,7 +238,10 @@ python3 run_web.py 8765                # http://127.0.0.1:8765
   the run — postings, matches, built resumes, pursuits, generated
   dossiers, the event feed — back to a blank board, so a fresh run (or
   a demo take) starts from nothing. The account itself (form, attested
-  profile, scout deposits) is not a run and is never wiped.
+  profile, scout deposits) is not a run and is never wiped. On the
+  judge demo link, Reset goes further: it also restores the sandbox
+  profile and search to their starting state and disconnects the
+  portals, so every judge starts from the same clean slate.
 - **Built resumes are deliverables**: every tailored resume downloads as
   an editable **Word (.docx)** or **PDF** (generated stdlib-only —
   `attested/export.py`), from the resume tab of its dossier.
