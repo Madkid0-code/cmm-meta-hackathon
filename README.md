@@ -11,6 +11,11 @@ Python verifier — never an LLM — decides what the seeker may truthfully clai
 
 > The LLM proposes. The code disposes.
 
+And it finishes the job: when you click **Apply** on a role that passed,
+CMM's Applier goes and submits the application for you, in your own
+signed-in session, and brings back the employer's confirmation. Nothing
+is ever submitted without your click.
+
 ## The complete pipeline
 
 CMM is not a "paste a JD" toy. It runs the same end-to-end model as the
@@ -82,30 +87,31 @@ immutable handoff chain, exactly like production.
    into a stronger claim. The assembled resume passes the deterministic
    guardrail one final time before it exists. A match without a built
    resume is never eligible for the applier — the production rule.
-9. **Applier** — queues a **pursuit** for every PASS match with a built
-   resume (route from the posting's source: dice / linkedin /
-   company_portal / board), assembles the complete application package
-   (tailored resume + attested form answers + apply URL), and tracks the
-   outcome loop: ready → prepared → applied / failed / expired, with the
-   confirmation text recorded as evidence (`run_apply.py`). The submission
-   click is the human's: this build never enters credentials and never
-   submits as the seeker — the demo persona is fictional, and applying as
-   a fictional person to real employers would be fraud. In the live
-   deployment the loop closes through the agent layer: the web UI records
-   an **apply request** on the seeker's click, and a Muse browser-agent
-   executor working in the seeker's own signed-in Dice session performs
-   the submission and brings back the employer's confirmation verbatim
-   (routes that apply on a company's own site are reported honestly as
-   package-only). In production, this same stage hands off to signed-in
-   per-route appliers on the seeker's own accounts.
+9. **Applier** — the click is yours; the applying is CMM's. You see a role
+   that passed, you click **Apply**, and the Applier goes and applies for
+   you: the web UI records an **apply request** on your click, and a Muse
+   browser-agent executor working in your own signed-in Dice session
+   performs the submission and brings back the employer's confirmation
+   verbatim. Behind that click, plain code does the bookkeeping: it queues
+   a **pursuit** for every PASS match with a built resume (route from the
+   posting's source: dice / linkedin / company_portal / board), assembles
+   the complete application package (tailored resume + attested form
+   answers + apply URL), and tracks the outcome loop: ready → prepared →
+   applied / failed / expired, with the confirmation text recorded as
+   evidence (`run_apply.py`). Routes that apply on a company's own site
+   are reported honestly as package-only. One honest limit for this build:
+   it never enters credentials and never submits as the seeker — the demo
+   persona is fictional, and applying as a fictional person to real
+   employers would be fraud. In production, this same stage hands off to
+   signed-in per-route appliers on the seeker's own accounts.
 10. **Evidence Dossier + Call Queue** — per match: **Defensible claims**
    (verified, each with its evidence) and **Vulnerable claims** (job
    requirements with no attested proof — claiming them is an interview
    liability) with a deterministic **Honest Pivot** built only from attested
    adjacent skills. There is no match score and no fit percentage, anywhere.
    The dossiers land in a call queue, and **the human decides**. The system
-   never submits an application and never screens a candidate for an
-   employer. It works for one person only: the job seeker.
+   never submits an application without your click, and never screens a
+   candidate for an employer. It works for one person only: the job seeker.
 
 A single-JD mode (`run_demo.py`) also exists for the reproducible fixture
 case, and the **Intake Audit** runs in both modes: the seeker's own outgoing
