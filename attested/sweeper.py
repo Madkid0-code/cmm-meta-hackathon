@@ -14,7 +14,7 @@ Sources (owner-directed, 2026-10-28 — two sources, both strong):
 - dice:      server-rendered search payload + public detail pages.
 - linkedin:  SIGNED-IN LinkedIn, the advanced source. The guest endpoint
   returns ID-only stubs and cannot filter for contract jobs, so it was
-  retired. Instead, a signed-in scout (a Muse browser agent working in the
+  retired. Instead, a signed-in scout (a Muse Wonder agent working in the
   seeker's own LinkedIn session — the production CMM pattern) searches
   with the Contract + Past-24h filters applied and deposits full job
   records (title, company, location, type, JD text) as fragment files

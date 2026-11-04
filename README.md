@@ -61,18 +61,18 @@ FORM ──► sweep config ──► SWEEPER ──► PARSER ──► keep ru
 | Stage | Powered by | Where it runs |
 |---|---|---|
 | Sweeper — Dice | Plain code | Inside the product |
-| Sweeper — LinkedIn (the Scout) | **Muse browser agent** in the seeker's own signed-in session | The seeker's browser |
+| Sweeper — LinkedIn (the Scout) | **Muse Wonder agent** in the seeker's own signed-in session | The seeker's browser |
 | Parser · Keep rule · **Verifier** | Plain code — never an LLM | Inside the product |
 | Reader · Builder | **Muse Spark 1.3** (Meta Model API) | Called by the product |
 | Applier — packaging & outcome tracking | Plain code | Inside the product |
-| Applier — the submission itself | **Muse browser agent** on the seeker's own signed-in session, on the seeker's click | The seeker's browser |
+| Applier — the submission itself | **Muse Wonder agent** on the seeker's own signed-in session, on the seeker's click | The seeker's browser |
 | The final decision | **The human** | — |
 
 Two moments in a job search can only happen *as the member*: LinkedIn's
 contract-filtered, hours-fresh search exists only inside a signed-in
 session, and a Dice application can only be submitted by the signed-in
 seeker. An API key cannot be a member. So those two seats are worked by
-Muse browser agents in the seeker's own session — read-only while
+Muse Wonder agents in the seeker's own session — read-only while
 scouting, acting only on an explicit Apply click while applying — and
 CMM never asks for or stores a password or a cookie.
 
